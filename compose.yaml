@@ -1,0 +1,33 @@
+# Keep STACK_NAME stable after the first deployment: it determines the data volume name.
+name: ${STACK_NAME:-no-one-survived}
+
+services:
+  no-one-survived:
+    image: ghcr.io/dadeeen/no-one-survived-server:${IMAGE_TAG:-latest}
+    container_name: ${CONTAINER_NAME:-no-one-survived}
+    restart: unless-stopped
+    # Allow the supervisor to finish its full graceful Wine shutdown sequence.
+    stop_grace_period: ${STOP_GRACE_PERIOD:-180s}
+
+    # Runtime configuration is kept in .env; passwords use compose.secrets.yaml.
+    env_file:
+      - .env
+
+    ports:
+      - "${HOST_BIND_ADDRESS:-0.0.0.0}:${GAME_PORT:-7777}:${GAME_PORT:-7777}/udp"
+      - "${HOST_BIND_ADDRESS:-0.0.0.0}:${QUERY_PORT:-27015}:${QUERY_PORT:-27015}/udp"
+
+    volumes:
+      - data:/data
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "${LOG_MAX_SIZE:-10m}"
+        max-file: "${LOG_MAX_FILES:-3}"
+
+volumes:
+  data:

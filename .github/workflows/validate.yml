@@ -1,0 +1,99 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install development checks
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Lint and type-check
+        run: |
+          ruff format --check src tests
+          ruff check src tests
+          mypy --strict src/nos_server
+
+      - name: Python unit tests
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -v
+
+      - name: Compile Python
+        run: python -m compileall -q src tests
+
+      - name: Validate shell scripts
+        run: |
+          bash -n docker-entrypoint.sh scripts/*.sh
+          sudo -u nobody -- ./scripts/test-shell-behavior.sh
+
+      - name: Validate PowerShell helper syntax
+        shell: pwsh
+        run: |
+          [scriptblock]::Create((Get-Content -Raw scripts/run-local-ci.ps1)) | Out-Null
+
+      - name: Validate Compose models
+        run: |
+          cp .env.example .env
+          install -d -m 0700 secrets
+          printf '%s\n' ci-server-password >secrets/server_password.txt
+          printf '%s\n' ci-admin-password >secrets/admin_password.txt
+          chmod 0600 secrets/*.txt
+          docker compose -f compose.yaml -f compose.build.yaml config >/dev/null
+          docker compose -f compose.yaml -f compose.secrets.yaml config >/dev/null
+          docker compose -f compose.yaml -f compose.build.yaml -f compose.secrets.yaml config >/dev/null
+          docker compose --env-file examples/portainer-stack.env.example \
+            -f examples/portainer-stack.yaml config >/dev/null
+          docker compose --env-file examples/portainer-stack.full.env.example \
+            -f examples/portainer-stack.full.yaml config >/dev/null
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build linux/amd64 image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: no-one-survived-server:ci
+          build-args: |
+            VERSION=ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test Wine and SteamCMD runtime
+        run: |
+          docker run --rm --entrypoint /usr/local/bin/nos-image-smoke \
+            no-one-survived-server:ci
+
+      - name: Report image size
+        run: docker image inspect no-one-survived-server:ci --format '{{.Size}}'

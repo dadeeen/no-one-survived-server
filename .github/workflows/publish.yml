@@ -1,0 +1,191 @@
+name: Build and publish image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate release ref
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          publish_latest=false
+          if [[ "${GITHUB_REF_TYPE}" == tag ]]; then
+            release_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+            if [[ ! "${GITHUB_REF_NAME}" =~ $release_pattern ]]; then
+              echo "Release tags must use valid vMAJOR.MINOR.PATCH SemVer with an optional pre-release suffix" >&2
+              exit 1
+            fi
+            if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+              prerelease="${GITHUB_REF_NAME#*-}"
+              IFS='.' read -r -a identifiers <<<"$prerelease"
+              for identifier in "${identifiers[@]}"; do
+                if [[ "$identifier" =~ ^[0-9]+$ && "$identifier" != 0 && "$identifier" == 0* ]]; then
+                  echo "Numeric pre-release identifiers must not contain leading zeroes: $identifier" >&2
+                  exit 1
+                fi
+              done
+            else
+              publish_latest=true
+            fi
+          fi
+          echo "publish_latest=$publish_latest" >>"$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refuse to overwrite an existing release tag
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          set -euo pipefail
+          exact_image="${REGISTRY}/${IMAGE_NAME}:${GITHUB_REF_NAME}"
+          set +e
+          manifest_output="$(docker manifest inspect "$exact_image" 2>&1)"
+          manifest_status=$?
+          set -e
+          if (( manifest_status == 0 )); then
+            echo "Refusing to overwrite existing release tag: $exact_image" >&2
+            exit 1
+          fi
+          if grep -Eqi 'manifest unknown|no such manifest|not found' <<<"$manifest_output"; then
+            exit 0
+          fi
+          echo "Unable to verify whether the release tag already exists: $exact_image" >&2
+          echo "$manifest_output" >&2
+          exit 1
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ steps.release.outputs.publish_latest }}
+
+      - name: Resolve and smoke-test immutable upstream inputs
+        id: pins
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          debian_ref=debian:trixie-slim
+          debian_digest="$(
+            docker buildx imagetools inspect "$debian_ref" \
+              | awk '$1 == "Digest:" {print $2; exit}'
+          )"
+          [[ "$debian_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          debian_image="${debian_ref}@${debian_digest}"
+          discovery_image="nos-release-discovery:${GITHUB_SHA}"
+
+          docker buildx build \
+            --pull \
+            --no-cache \
+            --platform linux/amd64 \
+            --load \
+            --tag "$discovery_image" \
+            --build-arg "DEBIAN_IMAGE=$debian_image" \
+            --build-arg "VERSION=discovery-${GITHUB_SHA}" \
+            .
+
+          wine_package_version="$(docker run --rm --entrypoint cat \
+            "$discovery_image" /usr/local/share/nos/wine-package-version)"
+          steamcmd_sha256="$(docker run --rm --entrypoint cat \
+            "$discovery_image" /usr/local/share/nos/steamcmd-bootstrap-sha256)"
+
+          test -n "$wine_package_version"
+          [[ "$steamcmd_sha256" =~ ^[0-9a-f]{64}$ ]]
+
+          candidate_image="nos-release-candidate:${GITHUB_SHA}"
+          cache_dir="${RUNNER_TEMP}/nos-release-cache"
+          rm -rf "$cache_dir"
+          docker buildx build \
+            --no-cache \
+            --platform linux/amd64 \
+            --load \
+            --cache-to "type=local,dest=${cache_dir},mode=max" \
+            --tag "$candidate_image" \
+            --build-arg "DEBIAN_IMAGE=$debian_image" \
+            --build-arg "WINE_DIST=trixie" \
+            --build-arg "WINE_MAJOR=11" \
+            --build-arg "WINE_PACKAGE_VERSION=$wine_package_version" \
+            --build-arg "STEAMCMD_SHA256=$steamcmd_sha256" \
+            --build-arg "VERSION=$RELEASE_VERSION" \
+            .
+
+          docker run --rm --entrypoint /usr/local/bin/nos-image-smoke \
+            "$candidate_image"
+
+          {
+            echo "debian_image=$debian_image"
+            echo "wine_package_version=$wine_package_version"
+            echo "steamcmd_sha256=$steamcmd_sha256"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Build and push pinned image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            DEBIAN_IMAGE=${{ steps.pins.outputs.debian_image }}
+            WINE_DIST=trixie
+            WINE_MAJOR=11
+            WINE_PACKAGE_VERSION=${{ steps.pins.outputs.wine_package_version }}
+            STEAMCMD_SHA256=${{ steps.pins.outputs.steamcmd_sha256 }}
+            VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=local,src=${{ runner.temp }}/nos-release-cache
+          provenance: mode=max
+          sbom: true
+
+      - name: Attest image provenance
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Report published digest and pins
+        run: |
+          echo "digest=${{ steps.build.outputs.digest }}"
+          echo "debian=${{ steps.pins.outputs.debian_image }}"
+          echo "wine=${{ steps.pins.outputs.wine_package_version }}"
+          echo "steamcmd=${{ steps.pins.outputs.steamcmd_sha256 }}"

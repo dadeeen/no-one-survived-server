@@ -1,0 +1,39 @@
+name: Real server integration test
+
+on:
+  workflow_dispatch:
+    inputs:
+      full_runtime:
+        description: Wait for a real A2S response before stopping
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build --build-arg VERSION=integration-${GITHUB_SHA} -t nos-integration:local .
+
+      - name: Run integration test
+        env:
+          FULL_RUNTIME: ${{ inputs.full_runtime }}
+        run: ./scripts/integration-test.sh
+
+      - name: Show final state and logs
+        if: always()
+        run: |
+          docker exec no-one-survived-integration nosctl status || true
+          docker logs no-one-survived-integration || true
+
+      - name: Stop test container
+        if: always()
+        run: docker rm -f no-one-survived-integration || true

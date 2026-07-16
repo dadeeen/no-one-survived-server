@@ -1,0 +1,11 @@
+services:
+  no-one-survived:
+    build:
+      context: .
+      args:
+        DEBIAN_IMAGE: ${DEBIAN_IMAGE:-debian:trixie-slim}
+        WINE_DIST: ${WINE_DIST:-trixie}
+        WINE_MAJOR: ${WINE_MAJOR:-11}
+        WINE_PACKAGE_VERSION: ${WINE_PACKAGE_VERSION:-}
+        STEAMCMD_SHA256: ${STEAMCMD_SHA256:-}
+    image: no-one-survived-server:local

@@ -1,0 +1,64 @@
+# Recommended Portainer stack. Import portainer-stack.env.example under
+# Environment variables. The full advanced variant is portainer-stack.full.yaml.
+
+# Keep the effective stack/project name stable: it determines the data volume name.
+name: ${STACK_NAME:-no-one-survived}
+
+services:
+  no-one-survived:
+    image: ghcr.io/dadeeen/no-one-survived-server:${IMAGE_TAG:-latest}
+    container_name: ${CONTAINER_NAME:-no-one-survived}
+    restart: unless-stopped
+    # Allow the supervisor to finish its full graceful Wine shutdown sequence.
+    stop_grace_period: ${STOP_GRACE_PERIOD:-180s}
+
+    ports:
+      - "${HOST_BIND_ADDRESS:-0.0.0.0}:${GAME_PORT:-7777}:${GAME_PORT:-7777}/udp"
+      - "${HOST_BIND_ADDRESS:-0.0.0.0}:${QUERY_PORT:-27015}:${QUERY_PORT:-27015}/udp"
+
+    environment:
+      TZ: ${TZ:-UTC}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      UMASK: ${UMASK:-0027}
+      # This is the same Wine path used by the image smoke test.
+      USE_XVFB: ${USE_XVFB:-true}
+
+      GAME_PORT: ${GAME_PORT:-7777}
+      QUERY_PORT: ${QUERY_PORT:-27015}
+
+      # Prepare the server, then keep the container alive in low-overhead wake mode.
+      START_SERVER_ON_CONTAINER_START: ${START_SERVER_ON_CONTAINER_START:-false}
+      AUTO_SLEEP_ENABLED: ${AUTO_SLEEP_ENABLED:-true}
+      IDLE_TIMEOUT_SECONDS: ${IDLE_TIMEOUT_SECONDS:-3600}
+      WAKE_SOURCE_POLICY: ${WAKE_SOURCE_POLICY:-private}
+      WAKE_ALLOWED_NETWORKS: ${WAKE_ALLOWED_NETWORKS:-}
+
+      SERVER_NAME: ${SERVER_NAME:-No One Survived}
+      SAVE_NAME: ${SAVE_NAME:-MainWorld}
+      REGION: ${REGION:-EU}
+      MAP: ${MAP:-Map01}
+      MAX_PLAYERS: ${MAX_PLAYERS:-8}
+      REQUIRE_PASSWORD: ${REQUIRE_PASSWORD:-true}
+
+      # Passwords stay outside the stack and are mounted read-only below.
+      SERVER_PASSWORD_FILE: /run/secrets/nos_server_password
+      ADMIN_PASSWORD_FILE: /run/secrets/nos_admin_password
+
+    volumes:
+      # Compose prefixes this volume with the effective project/stack name.
+      - data:/data
+      - ${SERVER_PASSWORD_PATH:-/opt/games/no-one-survived/secrets/server_password.txt}:/run/secrets/nos_server_password:ro
+      - ${ADMIN_PASSWORD_PATH:-/opt/games/no-one-survived/secrets/admin_password.txt}:/run/secrets/nos_admin_password:ro
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "${LOG_MAX_SIZE:-10m}"
+        max-file: "${LOG_MAX_FILES:-3}"
+
+volumes:
+  data:
