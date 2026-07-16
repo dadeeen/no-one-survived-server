@@ -46,6 +46,7 @@ jobs:
       - name: Validate shell scripts
         run: |
           bash -n docker-entrypoint.sh scripts/*.sh
+          chmod +x docker-entrypoint.sh scripts/*.sh
           sudo -u nobody -- ./scripts/test-shell-behavior.sh
 
       - name: Validate PowerShell helper syntax
