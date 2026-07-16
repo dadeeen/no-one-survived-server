@@ -46,8 +46,15 @@ jobs:
       - name: Validate shell scripts
         run: |
           bash -n docker-entrypoint.sh scripts/*.sh
-          chmod +x docker-entrypoint.sh scripts/*.sh
-          sudo -u nobody -- ./scripts/test-shell-behavior.sh
+
+          test_root="$(mktemp -d)"
+          trap 'sudo rm -rf "$test_root"' EXIT
+
+          sudo cp -a . "$test_root/repo"
+          sudo chmod +x "$test_root/repo/docker-entrypoint.sh" "$test_root/repo"/scripts/*.sh
+          sudo chown -R nobody:nogroup "$test_root"
+
+          sudo -u nobody -- bash -c "cd '$test_root/repo' && ./scripts/test-shell-behavior.sh"
 
       - name: Validate PowerShell helper syntax
         shell: pwsh
