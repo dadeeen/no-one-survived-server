@@ -41,9 +41,10 @@ The listener closes before the server process is started. A short arm delay prev
 
 The image executes:
 
-- the CubeCoders Wine base image;
-- Valve SteamCMD;
-- game server files downloaded anonymously by SteamCMD;
-- this repository's Python/shell supervisor.
+- the selected official Debian base image;
+- official WineHQ packages;
+- Valve's SteamCMD bootstrap;
+- game-server files downloaded anonymously by SteamCMD;
+- this repository's Python and shell supervisor.
 
-No game binaries are built into the published image. Pin `BASE_IMAGE` to a tested digest for a controlled release and review base-image updates before deployment.
+No game binaries are built into the published image. The release workflow records the Debian image digest, exact WineHQ package version and SteamCMD archive SHA-256 used by the tested candidate. Debian repository metadata and transitive APT packages are not frozen through a historical package snapshot, so releases are not claimed to be byte-for-byte reproducible at arbitrary future dates.

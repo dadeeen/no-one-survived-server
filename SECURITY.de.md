@@ -4,7 +4,9 @@
 
 ## Sicherheitslücke melden
 
-Nutze nach Möglichkeit die private Schwachstellenmeldung unter **Security → Report a vulnerability**. Ist diese Funktion nicht verfügbar, kontaktiere den Repository-Eigentümer auf einem privaten Weg. Lege für eine vermutete Sicherheitslücke kein öffentliches Issue an.
+Nutze die private Schwachstellenmeldung unter **Security → Report a vulnerability**. Lege kein öffentliches Issue mit Details zu einer Sicherheitslücke an.
+
+Ist die private Meldung nicht verfügbar, darf ein öffentliches Issue ausschließlich dazu dienen, nach einem privaten Kontaktweg zu fragen. Technische Details, Proof-of-Concept-Material und sensible Daten gehören nicht in dieses Issue.
 
 Nimm niemals Passwörter, Zugriffstoken, private Schlüssel, Spielstände oder ungeschwärzte private Netzwerkinformationen in einen Bericht auf.
 

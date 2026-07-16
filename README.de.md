@@ -1,12 +1,15 @@
 # No One Survived Dedicated Server — Docker
 
-[English](README.md) · [Konfiguration](docs/CONFIGURATION.de.md) · [Wake & Sleep](docs/WAKE-AND-SLEEP.de.md) · [Netzwerk](docs/NETWORKING.de.md) · [Portainer](docs/PORTAINER.de.md) · [Backup](docs/BACKUP-RESTORE.de.md) · [Lokale CI](docs/LOCAL-CI.de.md) · [Architektur](docs/ARCHITECTURE.de.md) · [Upstream](docs/UPSTREAM.de.md)
+[English](README.md) · [Konfiguration](docs/CONFIGURATION.de.md) · [Wake & Sleep](docs/WAKE-AND-SLEEP.de.md) · [Netzwerk](docs/NETWORKING.de.md) · [Portainer](docs/PORTAINER.de.md) · [Backup](docs/BACKUP-RESTORE.de.md) · [Fehlerbehebung](docs/TROUBLESHOOTING.de.md) · [Lokale CI](docs/LOCAL-CI.de.md) · [Architektur](docs/ARCHITECTURE.de.md) · [Upstream](docs/UPSTREAM.de.md) · [Changelog](CHANGELOG.md) · [Sicherheit](SECURITY.de.md)
 
 Ein Wine-/SteamCMD-Container für den Dedicated Server von **No One Survived**. Er installiert und aktualisiert den Server automatisch, hält Spielstände persistent, weckt bei einem erlaubten UDP-Paket und beendet den Gameserverprozess nach einer einstellbaren Leerlaufzeit.
 
 > Dieses Projekt ist inoffiziell und steht in keiner Verbindung zu Cat Play Studio, Steam, Valve oder CubeCoders. Spiel- und Dedicated-Server-Dateien werden nicht weiterverteilt.
 >
-> **Projektstatus:** Noch nicht abschließend im Produktivbetrieb validiert. Installation, Start und A2S-Prüfung wurden lokal erfolgreich getestet; der Container sollte daher grundsätzlich funktionieren. Die öffentliche Erreichbarkeit hängt jedoch vom Anschluss ab und ist noch nicht abschließend verifiziert.
+> **Validierungsstand**
+>
+> - Lokal erfolgreich geprüft: Installation und Update, Wine-Start, A2S-Antwort, UDP-Wake und sauberer Schlafzustand.
+> - Noch nicht abschließend geprüft: Langzeitbetrieb, Spielstandpersistenz über Spielupdates hinweg und öffentliche Erreichbarkeit in unterschiedlichen Netztypen.
 
 ## Schnellstart mit Docker Compose
 

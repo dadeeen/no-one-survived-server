@@ -2,19 +2,19 @@
 
 [English](LOCAL-CI.md) · [Zurück zur README](../README.de.md)
 
-Wenn GitHub Actions nicht verfügbar oder das Kontingent ausgeschöpft ist, führe ich die Repository-Prüfungen mit dem mitgelieferten PowerShell-Skript lokal aus. Das Skript bildet die regulären CI-Prüfungen in Linux-Containern nach und kann zusätzlich den umfangreichen Integrationstest mit dem echten Gameserver durchführen.
+Der mitgelieferte PowerShell-Runner bildet die regulären Repository-Prüfungen lokal nach und kann zusätzlich den umfangreichen Integrationstest mit dem echten Gameserver durchführen. Er eignet sich für Release-Prüfungen, Entwicklungschecks und Situationen, in denen die gehostete CI nicht verfügbar ist.
 
 ## Voraussetzungen
 
-Ich verwende:
+Benötigte Werkzeuge und Ressourcen:
 
 - PowerShell 7 (`pwsh`);
 - Git;
 - Docker Desktop oder eine andere Docker Engine im Linux-Container-Modus;
 - Docker Buildx und Docker Compose v2;
-- ausreichend freien Speicherplatz und Datenvolumen für Debian, Wine, SteamCMD und den Download des Dedicated Servers.
+- ausreichend freien Speicherplatz und Netzwerkkapazität für Debian, Wine, SteamCMD und den Download des Dedicated Servers.
 
-Das Skript testet den aktuell festgeschriebenen Stand `HEAD` in einem isolierten Git-Worktree. Ich committe deshalb die zu prüfenden Änderungen vor dem Start. Nicht festgeschriebene Änderungen im Arbeitsverzeichnis werden bewusst nicht einbezogen.
+Das Skript testet den aktuell festgeschriebenen Stand `HEAD` in einem isolierten Git-Worktree. Die zu prüfenden Änderungen müssen daher vor dem Start committet werden. Nicht festgeschriebene Änderungen im Arbeitsverzeichnis werden bewusst nicht einbezogen.
 
 ## Reguläre lokale CI
 
@@ -42,7 +42,7 @@ Der temporäre Worktree wird automatisch entfernt. Das erzeugte Image bleibt lok
 
 ## Sauberer releaseähnlicher Build
 
-Vor einem Release umgehe ich zusätzlich den lokalen Docker-Layer-Cache:
+Für Release-Kandidaten sollte der lokale Docker-Layer-Cache umgangen werden:
 
 ```powershell
 pwsh -NoProfile -File ./scripts/run-local-ci.ps1 -NoCache
@@ -58,7 +58,7 @@ Der Integrationstest lädt mehrere Gigabyte herunter und kann ungefähr 110 Minu
 pwsh -NoProfile -File ./scripts/run-local-ci.ps1 -NoCache -Integration
 ```
 
-Für die strengste Prüfung verlange ich zusätzlich eine erfolgreiche echte Steam-A2S-Antwort:
+Für die strengste Prüfung zusätzlich eine erfolgreiche echte Steam-A2S-Antwort verlangen:
 
 ```powershell
 pwsh -NoProfile -File ./scripts/run-local-ci.ps1 -NoCache -FullRuntime
@@ -82,7 +82,7 @@ Ein fehlgeschlagener Befehl beendet den Lauf mit einem Fehlercode. Integrationsc
 
 ## Release-Ablauf
 
-Veröffentlichte Images werden nicht mehr bei jedem Push auf `main` erzeugt. Ich veröffentliche über einen gültigen Tag nach dem Muster `vMAJOR.MINOR.PATCH`, optional mit gültigem SemVer-Pre-Release-Zusatz, oder über einen bewusst ausgelösten manuellen Workflow. Vor dem Push eines Images führt der Release-Workflow Folgendes aus:
+Veröffentlichte Images werden über einen gültigen Tag nach dem Muster `vMAJOR.MINOR.PATCH`, optional mit gültigem SemVer-Pre-Release-Zusatz, oder über einen bewusst ausgelösten manuellen Workflow erstellt. Vor dem Push eines Images führt der Release-Workflow Folgendes aus:
 
 1. Release-Tag validieren und verhindern, dass ein Pre-Release `latest` verschiebt;
 2. zuverlässig prüfen, dass der exakte Tag noch nicht existiert, und bei einer unklaren Registry-Antwort abbrechen;

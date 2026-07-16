@@ -2,19 +2,19 @@
 
 [Deutsch](LOCAL-CI.de.md) · [Back to README](../README.md)
 
-When GitHub Actions is unavailable or its quota is exhausted, I run the repository checks locally with the supplied PowerShell runner. The script executes the same routine checks in Linux containers and can optionally perform the large real-server integration test.
+The supplied PowerShell runner reproduces the routine repository checks locally and can optionally perform the large real-server integration test. It is useful for release validation, development checks and situations where hosted CI is unavailable.
 
 ## Prerequisites
 
-I use:
+Required tools and resources:
 
 - PowerShell 7 (`pwsh`);
 - Git;
 - Docker Desktop or another Docker Engine using Linux containers;
 - Docker Buildx and Docker Compose v2;
-- enough free disk space and network quota for Debian, Wine, SteamCMD and the dedicated-server download.
+- enough free disk space and network capacity for Debian, Wine, SteamCMD and the dedicated-server download.
 
-The script tests the current committed `HEAD` in an isolated Git worktree. I therefore commit the changes I want to test before starting it. Uncommitted working-tree changes are intentionally excluded.
+The script tests the current committed `HEAD` in an isolated Git worktree. Commit the changes that should be tested before starting it. Uncommitted working-tree changes are intentionally excluded.
 
 ## Routine local CI
 
@@ -42,7 +42,7 @@ The temporary worktree is removed automatically. The built image remains availab
 
 ## Clean release-style build
 
-Before a release I bypass the local Docker layer cache:
+Use a build without the local Docker layer cache for release candidates:
 
 ```powershell
 pwsh -NoProfile -File ./scripts/run-local-ci.ps1 -NoCache
@@ -58,7 +58,7 @@ The integration test downloads several gigabytes and can take up to roughly 110 
 pwsh -NoProfile -File ./scripts/run-local-ci.ps1 -NoCache -Integration
 ```
 
-For the strongest check I additionally require a successful real Steam A2S response:
+For the strongest check, also require a successful real Steam A2S response:
 
 ```powershell
 pwsh -NoProfile -File ./scripts/run-local-ci.ps1 -NoCache -FullRuntime
@@ -82,7 +82,7 @@ A failed command terminates the run with a non-zero exit. The integration contai
 
 ## Release workflow
 
-Published images are no longer created by every push to `main`. I publish from a valid `vMAJOR.MINOR.PATCH` tag, an optional valid SemVer pre-release tag or a deliberate manual workflow run. Before pushing an image, the release workflow:
+Published images are created from a valid `vMAJOR.MINOR.PATCH` tag, an optional valid SemVer pre-release tag or a deliberate manual workflow run. Before pushing an image, the release workflow:
 
 1. validates the release tag and prevents a pre-release from moving `latest`;
 2. verifies that an exact tag is absent and fails closed when the registry cannot answer reliably;

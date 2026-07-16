@@ -1,12 +1,15 @@
 # No One Survived Dedicated Server — Docker
 
-[Deutsch](README.de.md) · [Configuration](docs/CONFIGURATION.md) · [Wake & sleep](docs/WAKE-AND-SLEEP.md) · [Networking](docs/NETWORKING.md) · [Portainer](docs/PORTAINER.md) · [Backup](docs/BACKUP-RESTORE.md) · [Local CI](docs/LOCAL-CI.md) · [Architecture](docs/ARCHITECTURE.md) · [Upstream](docs/UPSTREAM.md)
+[Deutsch](README.de.md) · [Configuration](docs/CONFIGURATION.md) · [Wake & sleep](docs/WAKE-AND-SLEEP.md) · [Networking](docs/NETWORKING.md) · [Portainer](docs/PORTAINER.md) · [Backup](docs/BACKUP-RESTORE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Local CI](docs/LOCAL-CI.md) · [Architecture](docs/ARCHITECTURE.md) · [Upstream](docs/UPSTREAM.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md)
 
 A Wine/SteamCMD container for the **No One Survived** dedicated server. It installs and updates the server automatically, keeps saves persistent, wakes on an allowed UDP packet and shuts the game process down after a configurable idle period.
 
 > This project is unofficial and is not affiliated with Cat Play Studio, Steam, Valve or CubeCoders. It does not redistribute game or dedicated-server files.
 >
-> **Project status:** Not yet fully validated in production. Installation, startup and A2S checks have passed in local testing, so the container should work in principle. Public reachability still depends on the host network and has not yet been conclusively verified.
+> **Validation status**
+>
+> - Passed locally: installation and update, Wine startup, A2S response, UDP wake and graceful sleep.
+> - Not yet fully validated: long-term operation, save persistence across game updates and public reachability across different network types.
 
 ## Quick start with Docker Compose
 

@@ -41,9 +41,10 @@ Der Listener schließt vor dem Start des Serverprozesses. Eine kurze Aktivierung
 
 Das Image führt aus:
 
-- das CubeCoders-Wine-Basisimage;
-- Valve SteamCMD;
+- das ausgewählte offizielle Debian-Basisimage;
+- offizielle WineHQ-Pakete;
+- Valves SteamCMD-Bootstrap;
 - anonym von SteamCMD geladene Gameserverdateien;
 - den Python-/Shell-Supervisor dieses Repositorys.
 
-Spielbinärdateien werden nicht in das veröffentlichte Image eingebaut. Für kontrollierte Releases `BASE_IMAGE` auf einen getesteten Digest festlegen und Basisimage-Updates vor dem Deployment prüfen.
+Spielbinärdateien werden nicht in das veröffentlichte Image eingebaut. Der Release-Workflow zeichnet den Debian-Image-Digest, die exakte WineHQ-Paketversion und die SHA-256 des SteamCMD-Archivs des geprüften Kandidaten auf. Debian-Repository-Metadaten und transitive APT-Pakete werden nicht über einen historischen Paket-Snapshot eingefroren. Releases werden deshalb nicht als zu beliebigen zukünftigen Zeitpunkten bytegenau reproduzierbar bezeichnet.
