@@ -1,10 +1,10 @@
 # No One Survived Dedicated Server — Docker
 
-[Deutsch](README.de.md) · [Configuration](docs/CONFIGURATION.md) · [Wake & sleep](docs/WAKE-AND-SLEEP.md) · [Networking](docs/NETWORKING.md) · [Portainer](docs/PORTAINER.md) · [Backup](docs/BACKUP-RESTORE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Local CI](docs/LOCAL-CI.md) · [Architecture](docs/ARCHITECTURE.md) · [Upstream](docs/UPSTREAM.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md)
+[Deutsch](README.de.md) · [Configuration](docs/CONFIGURATION.md) · [Portainer](docs/PORTAINER.md) · [Networking](docs/NETWORKING.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
 
 A Wine/SteamCMD container for the **No One Survived** dedicated server. It installs and updates the server automatically, keeps saves persistent, wakes on an allowed UDP packet and shuts the game process down after a configurable idle period.
 
-> This project is unofficial and is not affiliated with Cat Play Studio, Steam, Valve or CubeCoders. It does not redistribute game or dedicated-server files.
+> This project is unofficial and is not affiliated with Cat Play Studio, Steam or Valve. It does not redistribute game or dedicated-server files.
 >
 > **Validation status**
 >
@@ -118,7 +118,7 @@ cp .env.example .env
 docker compose -f compose.yaml -f compose.build.yaml build
 ```
 
-The runtime is built directly from the official `debian:trixie-slim` image, official WineHQ stable packages from the selected Wine 11 release line and Valve's SteamCMD bootstrap. It includes no AMP or CubeCoders runtime files. Release publication records and pins the Debian digest, WineHQ package version and SteamCMD archive hash used by the tested candidate; transitive APT packages are not frozen through a historical package snapshot.
+The runtime is built directly from the official `debian:trixie-slim` image, official WineHQ stable packages from the selected Wine 11 release line and Valve's SteamCMD bootstrap. It does not use a third-party game-server control panel or prebuilt game-server runtime. Release publication records and pins the Debian digest, WineHQ package version and SteamCMD archive hash used by the tested candidate; transitive APT packages are not frozen through a historical package snapshot.
 
 ## Validation status
 
@@ -131,6 +131,12 @@ pwsh -NoProfile -File ./scripts/run-local-ci.ps1
 ```
 
 The optional real-server and A2S checks are documented under [Local CI](docs/LOCAL-CI.md). A production release should not be treated as validated until the current game build has passed startup, A2S, graceful-stop and save-persistence checks on a Docker host.
+
+## Documentation
+
+Additional user guides: [Wake & sleep](docs/WAKE-AND-SLEEP.md) and [Backup and restore](docs/BACKUP-RESTORE.md).
+
+Project and maintainer documentation: [Local CI](docs/LOCAL-CI.md), [Architecture](docs/ARCHITECTURE.md), [Upstream compatibility](docs/UPSTREAM.md), [Changelog](CHANGELOG.md) and [Security policy](SECURITY.md).
 
 ## License
 

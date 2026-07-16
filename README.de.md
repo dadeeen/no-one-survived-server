@@ -1,10 +1,10 @@
 # No One Survived Dedicated Server — Docker
 
-[English](README.md) · [Konfiguration](docs/CONFIGURATION.de.md) · [Wake & Sleep](docs/WAKE-AND-SLEEP.de.md) · [Netzwerk](docs/NETWORKING.de.md) · [Portainer](docs/PORTAINER.de.md) · [Backup](docs/BACKUP-RESTORE.de.md) · [Fehlerbehebung](docs/TROUBLESHOOTING.de.md) · [Lokale CI](docs/LOCAL-CI.de.md) · [Architektur](docs/ARCHITECTURE.de.md) · [Upstream](docs/UPSTREAM.de.md) · [Changelog](CHANGELOG.md) · [Sicherheit](SECURITY.de.md)
+[English](README.md) · [Konfiguration](docs/CONFIGURATION.de.md) · [Portainer](docs/PORTAINER.de.md) · [Netzwerk](docs/NETWORKING.de.md) · [Fehlerbehebung](docs/TROUBLESHOOTING.de.md)
 
 Ein Wine-/SteamCMD-Container für den Dedicated Server von **No One Survived**. Er installiert und aktualisiert den Server automatisch, hält Spielstände persistent, weckt bei einem erlaubten UDP-Paket und beendet den Gameserverprozess nach einer einstellbaren Leerlaufzeit.
 
-> Dieses Projekt ist inoffiziell und steht in keiner Verbindung zu Cat Play Studio, Steam, Valve oder CubeCoders. Spiel- und Dedicated-Server-Dateien werden nicht weiterverteilt.
+> Dieses Projekt ist inoffiziell und steht in keiner Verbindung zu Cat Play Studio, Steam oder Valve. Spiel- und Dedicated-Server-Dateien werden nicht weiterverteilt.
 >
 > **Validierungsstand**
 >
@@ -118,7 +118,7 @@ cp .env.example .env
 docker compose -f compose.yaml -f compose.build.yaml build
 ```
 
-Die Laufzeit wird direkt aus dem offiziellen Image `debian:trixie-slim`, den offiziellen stabilen WineHQ-Paketen der gewählten Wine-11-Linie und Valves SteamCMD-Bootstrap gebaut. AMP- oder CubeCoders-Laufzeitdateien sind nicht enthalten. Bei einer Veröffentlichung werden Debian-Digest, WineHQ-Paketversion und SteamCMD-Archivhash des geprüften Kandidaten aufgezeichnet und festgeschrieben; transitive APT-Pakete werden nicht über einen historischen Paket-Snapshot eingefroren.
+Die Laufzeit wird direkt aus dem offiziellen Image `debian:trixie-slim`, den offiziellen stabilen WineHQ-Paketen der gewählten Wine-11-Linie und Valves SteamCMD-Bootstrap gebaut. Sie verwendet weder ein fremdes Gameserver-Control-Panel noch eine vorgefertigte Gameserver-Laufzeit. Bei einer Veröffentlichung werden Debian-Digest, WineHQ-Paketversion und SteamCMD-Archivhash des geprüften Kandidaten aufgezeichnet und festgeschrieben; transitive APT-Pakete werden nicht über einen historischen Paket-Snapshot eingefroren.
 
 ## Validierungsstand
 
@@ -131,6 +131,12 @@ pwsh -NoProfile -File ./scripts/run-local-ci.ps1
 ```
 
 Die optionalen Prüfungen mit echtem Gameserver und A2S sind unter [Lokale CI](docs/LOCAL-CI.de.md) beschrieben. Ein produktives Release sollte erst als validiert gelten, wenn der aktuelle Spielbuild auf einem Docker-Host hinsichtlich Start, A2S, sauberem Stop und persistierenden Spielständen geprüft wurde.
+
+## Dokumentation
+
+Weitere Anleitungen: [Wake & Sleep](docs/WAKE-AND-SLEEP.de.md) sowie [Backup und Wiederherstellung](docs/BACKUP-RESTORE.de.md).
+
+Projekt- und Wartungsdokumentation: [Lokale CI](docs/LOCAL-CI.de.md), [Architektur](docs/ARCHITECTURE.de.md), [Upstream-Kompatibilität](docs/UPSTREAM.de.md), [Changelog](CHANGELOG.md) und [Sicherheitsrichtlinie](SECURITY.de.md).
 
 ## Lizenz
 
