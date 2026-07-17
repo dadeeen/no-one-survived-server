@@ -67,9 +67,9 @@ RUNTIME_ENV = {
     "GAME_INI_OVERRIDES_FILE",
 }
 GAME_ENV = set(MAPPINGS) - {"SERVER_PASSWORD", "ADMIN_PASSWORD"}
-FULL_REQUIRED_ENV = RUNTIME_ENV | GAME_ENV
+SUPPORTED_ENV = RUNTIME_ENV | GAME_ENV
 
-SIMPLE_PORTAINER_ENV = {
+PORTAINER_ENV = {
     "TZ",
     "PUID",
     "PGID",
@@ -116,7 +116,7 @@ def interpolation_keys(path: Path) -> set[str]:
 
 
 class ComposeConfigurationTests(unittest.TestCase):
-    def test_compose_uses_short_env_file(self) -> None:
+    def test_compose_uses_env_file(self) -> None:
         path = ROOT / "compose.yaml"
         text = path.read_text(encoding="utf-8")
         self.assertIn("env_file:", text)
@@ -127,61 +127,32 @@ class ComposeConfigurationTests(unittest.TestCase):
             set(),
         )
 
-    def test_recommended_stacks_use_smoke_tested_xvfb_path(self) -> None:
+    def test_configuration_reference_covers_supported_settings(self) -> None:
+        text = (ROOT / "docs/CONFIGURATION.md").read_text(encoding="utf-8")
+        missing = {key for key in SUPPORTED_ENV if f"`{key}`" not in text}
+        self.assertEqual(missing, set())
+
+    def test_recommended_examples_use_smoke_tested_xvfb_path(self) -> None:
         self.assertIn("USE_XVFB=true", (ROOT / ".env.example").read_text())
         self.assertIn(
-            "USE_XVFB: ${USE_XVFB:-true}",
+            'USE_XVFB: "true"',
             (ROOT / "examples/portainer-stack.yaml").read_text(),
         )
 
-    def test_full_portainer_stack_forwards_all_supported_settings(self) -> None:
-        keys = environment_keys(ROOT / "examples/portainer-stack.full.yaml")
-        self.assertEqual(FULL_REQUIRED_ENV - keys, set())
-
-    def test_full_environment_templates_cover_all_supported_settings(self) -> None:
-        for relative in (
-            ".env.full.example",
-            "examples/portainer-stack.full.env.example",
-        ):
-            with self.subTest(path=relative):
-                keys = env_template_keys(ROOT / relative)
-                self.assertEqual(FULL_REQUIRED_ENV - keys, set())
-
-    def test_simple_portainer_stack_keeps_the_golden_path_small(self) -> None:
+    def test_portainer_stack_is_copy_paste_ready(self) -> None:
         path = ROOT / "examples/portainer-stack.yaml"
+        text = path.read_text(encoding="utf-8")
         keys = environment_keys(path)
-        self.assertEqual(SIMPLE_PORTAINER_ENV - keys, set())
-        self.assertLess(len(keys), len(FULL_REQUIRED_ENV))
-        self.assertEqual(
-            interpolation_keys(path)
-            - env_template_keys(ROOT / "examples/portainer-stack.env.example"),
-            set(),
-        )
-
-    def test_simple_templates_are_subsets_of_full_templates(self) -> None:
-        pairs = (
-            (".env.example", ".env.full.example"),
-            (
-                "examples/portainer-stack.env.example",
-                "examples/portainer-stack.full.env.example",
-            ),
-        )
-        for simple, full in pairs:
-            with self.subTest(simple=simple, full=full):
-                self.assertTrue(
-                    env_template_keys(ROOT / simple) <= env_template_keys(ROOT / full)
-                )
+        self.assertNotIn("${", text)
+        self.assertNotIn("\nname:", f"\n{text}")
+        self.assertEqual(PORTAINER_ENV - keys, set())
+        self.assertLess(len(keys), len(SUPPORTED_ENV))
 
     def test_secret_delivery_is_explicit(self) -> None:
-        for relative in (
-            "examples/portainer-stack.yaml",
-            "examples/portainer-stack.full.yaml",
-        ):
-            with self.subTest(path=relative):
-                keys = environment_keys(ROOT / relative)
-                self.assertTrue(
-                    {"SERVER_PASSWORD_FILE", "ADMIN_PASSWORD_FILE"}.issubset(keys)
-                )
+        keys = environment_keys(ROOT / "examples/portainer-stack.yaml")
+        self.assertTrue(
+            {"SERVER_PASSWORD_FILE", "ADMIN_PASSWORD_FILE"}.issubset(keys)
+        )
         secret_overlay = (ROOT / "compose.secrets.yaml").read_text(encoding="utf-8")
         self.assertIn("SERVER_PASSWORD_FILE", secret_overlay)
         self.assertIn("ADMIN_PASSWORD_FILE", secret_overlay)

@@ -40,14 +40,14 @@ The first connection packet wakes the server but cannot complete the join. Retry
 
 1. Create the two password files as shown in the [Portainer example guide](examples/README.md#1-create-password-files).
 2. Open **Stacks → Add stack → Web editor** and paste [`examples/portainer-stack.yaml`](examples/portainer-stack.yaml).
-3. Import [`examples/portainer-stack.env.example`](examples/portainer-stack.env.example) under **Environment variables**.
+3. Edit the visible values directly in the YAML.
 4. Choose a permanent stack name and deploy.
 
-The recommended files expose only the settings needed for a normal installation. Advanced deployments can use [`examples/portainer-stack.full.yaml`](examples/portainer-stack.full.yaml) with [`examples/portainer-stack.full.env.example`](examples/portainer-stack.full.env.example).
+No separate environment file is required. The stack contains the common settings for a normal installation; add optional variables from [Configuration](docs/CONFIGURATION.md) only when needed.
 
 ## Most common settings
 
-Edit `.env` before deployment or recreate the container after changing it:
+For Docker Compose, edit `.env` before deployment. In Portainer, edit the same values directly below `environment:` in the stack:
 
 ```env
 SERVER_NAME=My NoS Server
@@ -57,7 +57,7 @@ IDLE_TIMEOUT_SECONDS=3600
 WAKE_SOURCE_POLICY=private
 ```
 
-The recommended `.env.example` covers the normal path, including the smoke-tested Xvfb Wine mode. Copy `.env.full.example` instead when every supported option should be visible. The complete descriptions are in [Configuration](docs/CONFIGURATION.md).
+The recommended `.env.example` and Portainer stack cover the normal path, including the smoke-tested Xvfb Wine mode. Every supported optional setting is described in [Configuration](docs/CONFIGURATION.md).
 
 ## How wake-on-packet works
 
@@ -122,7 +122,7 @@ The runtime is built directly from the official `debian:trixie-slim` image, offi
 
 ## Validation status
 
-The repository includes tests for UDP wake, CIDR policies, A2S parsing, INI-preserving configuration updates, secret validation, simple/full deployment-file parity, update scheduling, backup/restore safety and runtime-image invariants. The image build also smoke-tests amd64/i386 support, required runtime commands, SteamCMD startup and creation of a fresh Wine prefix.
+The repository includes tests for UDP wake, CIDR policies, A2S parsing, INI-preserving configuration updates, secret validation, Compose and copy-and-paste Portainer deployment models, update scheduling, backup/restore safety and runtime-image invariants. The image build also smoke-tests amd64/i386 support, required runtime commands, SteamCMD startup and creation of a fresh Wine prefix.
 
 When hosted Actions are unavailable, the complete routine check can be run from PowerShell with:
 

@@ -1,33 +1,19 @@
 # Portainer deployment
 
-[Deutsch](PORTAINER.de.md) · [Back to README](../README.md)
+[Deutsch](PORTAINER.de.md) · [Back to README](../README.md) · [Configuration reference](CONFIGURATION.md)
 
 ## Quick start
 
 1. Create the two non-empty password files as described in the [example guide](../examples/README.md#1-create-password-files).
 2. Open **Stacks → Add stack → Web editor**.
 3. Paste [`examples/portainer-stack.yaml`](../examples/portainer-stack.yaml).
-4. Import [`examples/portainer-stack.env.example`](../examples/portainer-stack.env.example) under **Environment variables**.
+4. Edit the visible values directly in the YAML.
 5. Choose a unique, permanent stack name and deploy.
 6. Follow the first installation with `docker logs -f no-one-survived`.
 
+No separate environment file is required. The stack contains the common settings for a normal installation. Add optional variables from the [configuration reference](CONFIGURATION.md) only when needed.
+
 The first deployment downloads the Windows dedicated server and initializes Wine. When `nosctl status` reports `SLEEPING`, setup is complete. The first connection packet only wakes the server; retry after startup.
-
-## Simple and full examples
-
-The recommended pair is intentionally short and covers a normal installation:
-
-- [`examples/portainer-stack.yaml`](../examples/portainer-stack.yaml)
-- [`examples/portainer-stack.env.example`](../examples/portainer-stack.env.example)
-
-Advanced deployments can expose every supported setting with:
-
-- [`examples/portainer-stack.full.yaml`](../examples/portainer-stack.full.yaml)
-- [`examples/portainer-stack.full.env.example`](../examples/portainer-stack.full.env.example)
-
-Both variants use the same image, persistent data layout, password-file mounts, stop grace period, security option and log rotation. The full files are a reference, not a requirement for normal use.
-
-The root `compose.yaml` uses a local `.env` file and is intended for Docker Compose. For Portainer's web editor, use the dedicated examples above instead of copying the root file.
 
 ## GHCR registry access
 
@@ -39,26 +25,34 @@ Image name:
 ghcr.io/dadeeen/no-one-survived-server:latest
 ```
 
-Prefer a tested release tag such as `v0.1.0` for stable operation.
+For stable operation, replace `latest` in the stack with a tested release tag such as `v0.1.0`.
 
-## Why the stack contains comments
+## Editing the stack
 
-Comments are limited to behavior that is not obvious from the setting name:
+The example intentionally uses direct values instead of `${VARIABLE}` placeholders. Edit common settings in place:
 
-- the effective project/stack name determines the persistent volume name;
+```yaml
+environment:
+  TZ: Europe/Berlin
+  SERVER_NAME: My NoS Server
+  MAX_PLAYERS: "8"
+  IDLE_TIMEOUT_SECONDS: "3600"
+```
+
+Optional settings can be added to the same `environment:` block. Keep boolean and numeric values quoted in YAML to make their string representation explicit.
+
+The comments are limited to behavior that is not obvious from a setting name:
+
+- the Portainer stack name determines the persistent volume name;
 - the 180-second stop grace period lets the supervisor complete Wine shutdown;
 - the container remains running in `SLEEPING` so the UDP wake listener stays available;
 - password files are mounted read-only outside the stack definition.
 
-Routine variable names are left self-explanatory. Detailed descriptions remain in [Configuration](CONFIGURATION.md).
-
 ## Project-scoped data volume
 
-The supplied stacks use the logical volume name `data`:
+The supplied stack uses the logical volume name `data`:
 
 ```yaml
-name: ${STACK_NAME:-no-one-survived}
-
 services:
   no-one-survived:
     volumes:
@@ -68,9 +62,9 @@ volumes:
   data:
 ```
 
-Compose prefixes it with the **effective project name**. With the default project/stack name, the Docker volume normally appears as `no-one-survived_data`.
+Portainer prefixes it with the stack name. A stack named `no-one-survived` normally creates the Docker volume `no-one-survived_data`.
 
-Portainer's stack name, `docker compose -p`, and `COMPOSE_PROJECT_NAME` can determine or override the effective project name. Do not rename the stack/project after the first deployment. A new name creates a new empty volume; the previous volume remains intact but is no longer mounted automatically.
+Do not rename the stack after the first deployment. A new name creates a new empty volume; the previous volume remains intact but is no longer mounted automatically.
 
 For a second instance, use a different permanent stack name, container name and host ports. Its volume is isolated automatically.
 
@@ -88,7 +82,7 @@ Portainer reports the container as healthy while sleeping. This is intentional.
 
 1. Read the release notes and base-image change.
 2. Back up `/data/saved` outside the container host.
-3. Select the tested release tag in the stack variables.
+3. Replace the tag in the stack's `image:` line with the tested release tag.
 4. Recreate the container without deleting the volume.
 5. Verify the server state with `nosctl status`.
 

@@ -71,10 +71,7 @@ jobs:
           docker compose -f compose.yaml -f compose.build.yaml config >/dev/null
           docker compose -f compose.yaml -f compose.secrets.yaml config >/dev/null
           docker compose -f compose.yaml -f compose.build.yaml -f compose.secrets.yaml config >/dev/null
-          docker compose --env-file examples/portainer-stack.env.example \
-            -f examples/portainer-stack.yaml config >/dev/null
-          docker compose --env-file examples/portainer-stack.full.env.example \
-            -f examples/portainer-stack.full.yaml config >/dev/null
+          docker compose -f examples/portainer-stack.yaml config >/dev/null
 
   docker-build:
     runs-on: ubuntu-latest

@@ -2,18 +2,21 @@
 
 [English](CONFIGURATION.md) · [Zurück zur README](../README.de.md)
 
-Die Werte werden über Umgebungsvariablen übergeben. Boolesche Werte akzeptieren `true/false`, `1/0`, `yes/no` und `on/off`. Die empfohlene `.env.example` und der einfache Portainer-Stack zeigen die üblichen Einstellungen für eine normale Installation. `.env.full.example` und die `.full`-Portainer-Dateien enthalten alle nachfolgenden Optionen; Regressionstests halten die vollständigen Dateien komplett und die einfachen Dateien mit ihren Vorlagen synchron.
+Die Werte werden über Umgebungsvariablen übergeben. Boolesche Werte akzeptieren `true/false`, `1/0`, `yes/no` und `on/off`. Die empfohlene `.env.example` und der direkt einsetzbare Portainer-Stack enthalten die üblichen Einstellungen für eine normale Installation. Alle weiteren Variablen können für Docker Compose zu `.env` oder in Portainer zum vorhandenen `environment:`-Block ergänzt werden.
 
-## Nur für Compose/Portainer
+## Docker-Compose-Einstellungen
 
 | Variable | Standard | Bedeutung |
 |---|---:|---|
+| `TZ` | `UTC` | Zeitzone des Containers, zum Beispiel `Europe/Berlin`. |
 | `STACK_NAME` | `no-one-survived` | Effektiver Compose-Projektname und Präfix des `data`-Volumes. Nach dem ersten Deployment stabil halten. |
 | `IMAGE_TAG` | `latest` | GHCR-Image-Tag. Für stabilen Betrieb einen getesteten Release-Tag verwenden. |
 | `CONTAINER_NAME` | `no-one-survived` | Expliziter Containername. Muss sich zwischen Instanzen unterscheiden. |
 | `HOST_BIND_ADDRESS` | `0.0.0.0` | Hostadresse für die beiden veröffentlichten UDP-Ports. |
 | `STOP_GRACE_PERIOD` | `180s` | Docker-Stopfrist. Sie ist länger als der vollständige interne Eskalationspfad beim Beenden. |
 | `LOG_MAX_SIZE` / `LOG_MAX_FILES` | `10m` / `3` | Rotation des Docker-Logtreibers `json-file`. |
+
+In Portainer werden die entsprechenden Image-, Container-, Port-, Stopfrist- und Logging-Werte direkt in `examples/portainer-stack.yaml` geändert. Der Portainer-Stackname bestimmt das Präfix des benannten Volumes.
 
 ## Lebenszyklus und Updates
 
@@ -88,13 +91,13 @@ Das Standardverhalten ist bewusst konservativ: Ein A2S-Fehler setzt den Leerlauf
 | `SERVER_READY_TIMEOUT_SECONDS` | `300` | Danach gilt ein lebender Prozess als laufend, auch wenn sich die bekannte Ready-Logzeile geändert hat. |
 | `SERVER_STOP_TIMEOUT_SECONDS` | `90` | Schonfrist nach SIGINT, bevor eskaliert wird. |
 | `EXTRA_SERVER_ARGS` | leer | Zusätzliche Argumente; werden mit Shell-ähnlicher Quotierung zerlegt, aber ohne Shell gestartet. |
-| `USE_XVFB` | `true` in den mitgelieferten Stacks | Wine-Befehle mit `xvfb-run -a` starten. Dies ist der empfohlene Deployment-Pfad und wird im Laufzeit-Smoke-Test geprüft. `false` erst verwenden, nachdem direkter Headless-Betrieb auf dem Zielhost getestet wurde. |
+| `USE_XVFB` | `true` in den mitgelieferten Beispielen | Wine-Befehle mit `xvfb-run -a` starten. Dies ist der empfohlene Deployment-Pfad und wird im Laufzeit-Smoke-Test geprüft. `false` erst verwenden, nachdem direkter Headless-Betrieb auf dem Zielhost getestet wurde. |
 
 Beide Ports müssen als UDP veröffentlicht werden. Host- und Containerport sollten identisch bleiben, da `Engine.ini` und Kommandozeile dieselben Werte erhalten.
 
 ## Spielkonfiguration
 
-Nur nicht leere Spielkonfigurationsvariablen überschreiben Werte in `Game.ini`. Leere Werte gelten als nicht gesetzt, sodass manuell gepflegte Werte erhalten bleiben. Die kurzen Env-Vorlagen enthalten die üblichen Startwerte; die vollständigen Vorlagen und der vollständige Portainer-Stack zeigen jede Einstellung. Unbekannte Abschnitte, Schlüssel und Kommentare bleiben erhalten.
+Nur nicht leere Spielkonfigurationsvariablen überschreiben Werte in `Game.ini`. Leere Werte gelten als nicht gesetzt, sodass manuell gepflegte Werte erhalten bleiben. Die mitgelieferten Beispiele enthalten übliche Startwerte. Jede unten aufgeführte Variable kann zu `.env` oder zum `environment:`-Block in Portainer ergänzt werden, wenn sie durch den Container verwaltet werden soll. Unbekannte Abschnitte, Schlüssel und Kommentare bleiben erhalten.
 
 | Variable | INI-Schlüssel | Zulässige Werte |
 |---|---|---|
@@ -124,13 +127,13 @@ Nur nicht leere Spielkonfigurationsvariablen überschreiben Werte in `Game.ini`.
 | `NOVICE_GIFT_BAG` | `GameSettings.GiftBagForNovices` | Boolean |
 | `NPC_ITEM_SPAWN` | `GameSettings.NPCItemSpawn` | 0,1–10 |
 
-Zukünftige oder seltene Einstellungen können als JSON übergeben werden:
+Zukünftige oder seltene Einstellungen können über `GAME_INI_OVERRIDES` als JSON übergeben werden:
 
 ```env
 GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"AnotherValue":2}}
 ```
 
-Für komplexes oder sensibles JSON steht `GAME_INI_OVERRIDES_FILE` zur Verfügung. Die referenzierte Datei muss in den Container eingebunden und für die konfigurierte `PUID` lesbar sein; die mitgelieferten Stacks binden beliebige Override-Dateien nicht automatisch ein.
+Für komplexes oder sensibles JSON steht `GAME_INI_OVERRIDES_FILE` zur Verfügung. Die referenzierte Datei muss in den Container eingebunden und für die konfigurierte `PUID` lesbar sein; die mitgelieferten Beispiele binden beliebige Override-Dateien nicht automatisch ein.
 
 ### Passwörter
 

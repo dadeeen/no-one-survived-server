@@ -40,14 +40,14 @@ Das erste Verbindungspaket weckt den Server, kann den Beitritt aber nicht abschl
 
 1. Die beiden Passwortdateien wie in der [Portainer-Beispielanleitung](examples/README.de.md#1-passwortdateien-anlegen) erstellen.
 2. Unter **Stacks → Add stack → Web editor** den Inhalt von [`examples/portainer-stack.yaml`](examples/portainer-stack.yaml) einfügen.
-3. [`examples/portainer-stack.env.example`](examples/portainer-stack.env.example) unter **Environment variables** importieren.
+3. Die sichtbaren Werte direkt im YAML anpassen.
 4. Einen dauerhaften Stacknamen wählen und bereitstellen.
 
-Die empfohlenen Dateien zeigen nur die Einstellungen für eine normale Installation. Für erweiterte Deployments stehen [`examples/portainer-stack.full.yaml`](examples/portainer-stack.full.yaml) und [`examples/portainer-stack.full.env.example`](examples/portainer-stack.full.env.example) bereit.
+Eine zusätzliche Env-Datei ist nicht erforderlich. Der Stack enthält die üblichen Einstellungen für eine normale Installation; optionale Variablen aus der [Konfiguration](docs/CONFIGURATION.de.md) nur bei Bedarf ergänzen.
 
 ## Häufigste Einstellungen
 
-Vor dem Deployment `.env` bearbeiten oder den Container nach einer Änderung neu erzeugen:
+Für Docker Compose vor dem Deployment `.env` bearbeiten. In Portainer dieselben Werte direkt unter `environment:` im Stack ändern:
 
 ```env
 SERVER_NAME=Mein NoS Server
@@ -57,7 +57,7 @@ IDLE_TIMEOUT_SECONDS=3600
 WAKE_SOURCE_POLICY=private
 ```
 
-Die empfohlene `.env.example` deckt den normalen Einstieg einschließlich des im Smoke-Test geprüften Xvfb-Wine-Pfads ab. Soll jede unterstützte Option sichtbar sein, stattdessen `.env.full.example` nach `.env` kopieren. Alle Beschreibungen stehen unter [Konfiguration](docs/CONFIGURATION.de.md).
+Die empfohlene `.env.example` und der Portainer-Stack decken den normalen Einstieg einschließlich des im Smoke-Test geprüften Xvfb-Wine-Pfads ab. Alle unterstützten optionalen Einstellungen stehen unter [Konfiguration](docs/CONFIGURATION.de.md).
 
 ## Funktionsweise von Wake-on-Packet
 
@@ -122,7 +122,7 @@ Die Laufzeit wird direkt aus dem offiziellen Image `debian:trixie-slim`, den off
 
 ## Validierungsstand
 
-Das Repository enthält Tests für UDP-Wake, CIDR-Richtlinien, A2S-Auswertung, den erhaltenden INI-Merge, Secret-Validierung, die Parität der einfachen und vollständigen Deployment-Dateien, Update-Zeitsteuerung, Backup-/Restore-Sicherheit und die Invarianten des Laufzeitimages. Der Image-Build prüft zusätzlich amd64-/i386-Unterstützung, notwendige Laufzeitprogramme, den SteamCMD-Start und die Erstellung eines frischen Wine-Prefix.
+Das Repository enthält Tests für UDP-Wake, CIDR-Richtlinien, A2S-Auswertung, den erhaltenden INI-Merge, Secret-Validierung, die Docker-Compose- und direkt einsetzbaren Portainer-Modelle, Update-Zeitsteuerung, Backup-/Restore-Sicherheit und die Invarianten des Laufzeitimages. Der Image-Build prüft zusätzlich amd64-/i386-Unterstützung, notwendige Laufzeitprogramme, den SteamCMD-Start und die Erstellung eines frischen Wine-Prefix.
 
 Ist die gehostete Actions-Ausführung nicht verfügbar, lässt sich die vollständige reguläre Prüfung lokal aus PowerShell starten:
 

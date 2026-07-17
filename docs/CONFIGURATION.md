@@ -2,18 +2,21 @@
 
 [Deutsch](CONFIGURATION.de.md) · [Back to README](../README.md)
 
-Values are supplied through environment variables. Boolean values accept `true/false`, `1/0`, `yes/no` and `on/off`. The recommended `.env.example` and Portainer stack expose the common settings needed for a normal installation. `.env.full.example` and the `.full` Portainer files expose every setting below; regression tests keep the full files complete and the simple files aligned with their templates.
+Values are supplied through environment variables. Boolean values accept `true/false`, `1/0`, `yes/no` and `on/off`. The recommended `.env.example` and copy-and-paste Portainer stack include the common settings needed for a normal installation. Add any other variable below to `.env` for Docker Compose or to the existing `environment:` block in Portainer.
 
-## Compose-only settings
+## Docker Compose settings
 
 | Variable | Default | Meaning |
 |---|---:|---|
+| `TZ` | `UTC` | Container time zone, for example `Europe/Berlin`. |
 | `STACK_NAME` | `no-one-survived` | Effective Compose project name and prefix of the `data` volume. Keep stable after first deployment. |
 | `IMAGE_TAG` | `latest` | GHCR image tag. Prefer a tested release tag for stable operation. |
 | `CONTAINER_NAME` | `no-one-survived` | Explicit container name. Must differ between instances. |
 | `HOST_BIND_ADDRESS` | `0.0.0.0` | Host address used for the two published UDP ports. |
 | `STOP_GRACE_PERIOD` | `180s` | Docker stop grace period. This exceeds the supervisor's full graceful-stop escalation path. |
 | `LOG_MAX_SIZE` / `LOG_MAX_FILES` | `10m` / `3` | Docker `json-file` log rotation. |
+
+In Portainer, edit the equivalent image, container, port, stop-grace and logging values directly in `examples/portainer-stack.yaml`. The Portainer stack name determines the named-volume prefix.
 
 ## Lifecycle and updates
 
@@ -88,13 +91,13 @@ The default behavior is deliberately conservative: an A2S failure clears the idl
 | `SERVER_READY_TIMEOUT_SECONDS` | `300` | Time after which a live process is treated as running even if the known readiness log line changed. |
 | `SERVER_STOP_TIMEOUT_SECONDS` | `90` | Grace period after SIGINT before escalation. |
 | `EXTRA_SERVER_ARGS` | empty | Extra arguments parsed with shell-like quoting and appended without using a shell. |
-| `USE_XVFB` | `true` in bundled stacks | Prefix Wine commands with `xvfb-run -a`. This is the default deployment path and the path exercised by the runtime smoke test. Set `false` only after validating direct headless Wine on the target host. |
+| `USE_XVFB` | `true` in supplied examples | Prefix Wine commands with `xvfb-run -a`. This is the default deployment path and the path exercised by the runtime smoke test. Set `false` only after validating direct headless Wine on the target host. |
 
 The container publishes both ports as UDP. Host and container port numbers should remain identical because the generated `Engine.ini` and command line use the same values.
 
 ## Game configuration
 
-Only non-empty game-setting variables overwrite values in `Game.ini`. Empty values are treated as unset, so manually maintained values are preserved. The short environment templates provide common initial values; the full templates and full Portainer stack expose every setting. Unknown sections, unknown keys and comments are preserved.
+Only non-empty game-setting variables overwrite values in `Game.ini`. Empty values are treated as unset, so manually maintained values are preserved. The supplied examples provide common initial values. Add any variable listed below to `.env` or to Portainer's `environment:` block when it should be managed by the container. Unknown sections, unknown keys and comments are preserved.
 
 | Variable | INI key | Accepted values |
 |---|---|---|
@@ -124,13 +127,13 @@ Only non-empty game-setting variables overwrite values in `Game.ini`. Empty valu
 | `NOVICE_GIFT_BAG` | `GameSettings.GiftBagForNovices` | boolean |
 | `NPC_ITEM_SPAWN` | `GameSettings.NPCItemSpawn` | 0.1–10 |
 
-Future or uncommon settings can be supplied as JSON:
+Future or uncommon settings can be supplied through `GAME_INI_OVERRIDES` as JSON:
 
 ```env
 GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"AnotherValue":2}}
 ```
 
-For complex or sensitive JSON use `GAME_INI_OVERRIDES_FILE`. The referenced file must be mounted into the container and readable by the configured `PUID`; the bundled stacks do not automatically mount arbitrary override files.
+For complex or sensitive JSON use `GAME_INI_OVERRIDES_FILE`. The referenced file must be mounted into the container and readable by the configured `PUID`; the supplied examples do not automatically mount arbitrary override files.
 
 ### Passwords
 

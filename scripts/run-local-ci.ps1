@@ -238,17 +238,7 @@ runuser -u nobody -- ./scripts/test-shell-behavior.sh
         "-f", "compose.secrets.yaml", "config"
     ) | Out-Null
     Invoke-Native docker @(
-        "compose", "--env-file", "examples/portainer-stack.env.example",
-        "-f", "examples/portainer-stack.yaml", "config"
-    ) | Out-Null
-    Invoke-Native docker @(
-        "compose", "--env-file", "examples/portainer-stack.full.env.example",
-        "-f", "examples/portainer-stack.full.yaml", "config"
-    ) | Out-Null
-    Copy-Item .env.full.example .env -Force
-    Invoke-Native docker @(
-        "compose", "-f", "compose.yaml", "-f", "compose.build.yaml",
-        "-f", "compose.secrets.yaml", "config"
+        "compose", "-f", "examples/portainer-stack.yaml", "config"
     ) | Out-Null
 
     Write-Host "`n== linux/amd64 image build =="

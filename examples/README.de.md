@@ -1,20 +1,12 @@
-# Empfohlener Portainer-Stack
+# Portainer-Stack-Beispiel
 
-[English](README.md) · [Portainer-Dokumentation](../docs/PORTAINER.de.md)
+[English](README.md) · [Portainer-Dokumentation](../docs/PORTAINER.de.md) · [Konfigurationsreferenz](../docs/CONFIGURATION.de.md)
 
-Das empfohlene Portainer-Paar ist bewusst kurz:
-
-- [`portainer-stack.yaml`](portainer-stack.yaml)
-- [`portainer-stack.env.example`](portainer-stack.env.example)
-
-Es enthält das persistente Daten-Volume, schreibgeschützte Passwortdateien, sichere Wake-/Sleep-Standards, eine ausreichende Stopfrist, Log-Rotation und `no-new-privileges`. Das erweiterte Paar zeigt alle unterstützten Einstellungen:
-
-- [`portainer-stack.full.yaml`](portainer-stack.full.yaml)
-- [`portainer-stack.full.env.example`](portainer-stack.full.env.example)
+[`portainer-stack.yaml`](portainer-stack.yaml) ist das einzige Portainer-Beispiel. Es kann direkt in den Portainer-Webeditor eingefügt werden und enthält sinnvolle Standardwerte für eine normale Installation. Eine zusätzliche Env-Datei ist nicht erforderlich.
 
 ## 1. Passwortdateien anlegen
 
-Die Beispiele verwenden UID und GID `1000`. Bei anderen IDs die Befehle und Stackvariablen entsprechend anpassen.
+Das Beispiel verwendet UID und GID `1000`. Bei anderen IDs sowohl die Befehle als auch `PUID` und `PGID` im Stack anpassen.
 
 ```bash
 sudo install -d -m 0750 -o 1000 -g 1000 /opt/games/no-one-survived/secrets
@@ -32,15 +24,17 @@ Beide Dateien müssen einen nicht leeren Wert enthalten. Leere Secret-Dateien we
 
 ## 2. Stack anlegen
 
-1. **Stacks → Add stack → Web editor** öffnen und `portainer-stack.yaml` einfügen.
-2. Einen eindeutigen, dauerhaften Portainer-Stacknamen wählen.
-3. `portainer-stack.env.example` unter **Environment variables** importieren.
-4. Bei privatem GHCR-Package `ghcr.io` als Registry mit einem Token mit `read:packages` eintragen.
+1. **Stacks → Add stack → Web editor** öffnen.
+2. [`portainer-stack.yaml`](portainer-stack.yaml) einfügen.
+3. Die sichtbaren Werte direkt im YAML anpassen, insbesondere Image-Tag, Zeitzone, Servername und Spielerlimit.
+4. Einen eindeutigen, dauerhaften Portainer-Stacknamen wählen.
 5. Stack bereitstellen und das Containerprotokoll verfolgen.
 
-Das logische Volume heißt im Stack `data`. Compose beziehungsweise Portainer ergänzt den effektiven Projekt-/Stacknamen. Beim Standardnamen entsteht normalerweise `no-one-survived_data`.
+Für ein privates GHCR-Package `ghcr.io` als Registry mit einem Token mit `read:packages` eintragen. Öffentliche Packages benötigen keine Registry-Zugangsdaten.
 
-**Den effektiven Projekt-/Stacknamen nach dem ersten Deployment stabil halten.** Eine Umbenennung erzeugt ein neues leeres Volume; das alte bleibt erhalten, wird aber nicht mehr automatisch eingebunden.
+Das logische Volume heißt `data`. Portainer stellt den Stacknamen voran; ein Stack namens `no-one-survived` erzeugt daher normalerweise `no-one-survived_data`.
+
+**Den Stacknamen nach dem ersten Deployment stabil halten.** Eine Umbenennung erzeugt ein neues leeres Volume; das alte bleibt vorhanden, wird aber nicht mehr automatisch eingebunden.
 
 ## 3. Was passiert danach?
 
@@ -53,41 +47,41 @@ docker logs -f no-one-survived
 
 Das erste Verbindungspaket weckt den Server nur. Favorit oder Direktverbindung nach dem Start erneut aufrufen.
 
-## Häufigste Anpassungen
+## Häufige Anpassungen
 
-```env
-SERVER_NAME=Mein NoS Server
-MAX_PLAYERS=8
-TZ=Europe/Berlin
-IDLE_TIMEOUT_SECONDS=3600
-WAKE_SOURCE_POLICY=private
+Die Werte direkt unter `environment:` ändern:
+
+```yaml
+environment:
+  TZ: Europe/Berlin
+  SERVER_NAME: Mein NoS Server
+  MAX_PLAYERS: "8"
+  IDLE_TIMEOUT_SECONDS: "3600"
+  WAKE_SOURCE_POLICY: private
 ```
 
 Für eine strikte Liste vertrauenswürdiger Netze:
 
-```env
-WAKE_SOURCE_POLICY=allowlist
-WAKE_ALLOWED_NETWORKS=192.168.10.0/24,10.50.0.0/24
+```yaml
+environment:
+  WAKE_SOURCE_POLICY: allowlist
+  WAKE_ALLOWED_NETWORKS: 192.168.10.0/24,10.50.0.0/24
 ```
 
-`WAKE_SOURCE_POLICY=any` nur bewusst für öffentlich erreichbare UDP-Ports verwenden.
-
-## Erweiterte Konfiguration
-
-Den `.full`-Stack und die vollständige Env-Vorlage verwenden, wenn Update-Zeitsteuerung, A2S-Tuning, Wine-Kompatibilität, Crash-Recovery oder erweiterte Spieleinstellungen direkt in Portainer sichtbar sein sollen. Einfache und vollständige Variante verwenden dasselbe persistente Volume- und Passwortdateikonzept.
+`WAKE_SOURCE_POLICY: any` nur bewusst für öffentlich erreichbare UDP-Ports verwenden. Alle unterstützten optionalen Variablen stehen in der [Konfigurationsreferenz](../docs/CONFIGURATION.de.md); nur die benötigten Variablen zum vorhandenen `environment:`-Block ergänzen.
 
 ## Zweite Serverinstanz
 
-Portainer-Projekt-/Stackname, Containername und Hostports müssen eindeutig sein:
+Einen anderen dauerhaften Portainer-Stacknamen wählen und anschließend Containername sowie Hostports ändern:
 
-```env
-STACK_NAME=no-one-survived-2
-CONTAINER_NAME=no-one-survived-2
-GAME_PORT=7778
-QUERY_PORT=27016
+```yaml
+container_name: no-one-survived-2
+ports:
+  - "7778:7777/udp"
+  - "27016:27015/udp"
 ```
 
-Compose erzeugt für den zweiten Stack normalerweise `no-one-survived-2_data`.
+Die internen Ports bleiben `7777` und `27015`. Portainer weist dem zweiten Stack automatisch ein eigenes benanntes Volume zu.
 
 ## Volume- und Image-Pflege
 
@@ -98,4 +92,4 @@ docker volume ls --filter name=no-one-survived
 
 Das Volume bleibt bei einer Neuerstellung oder Aktualisierung des Containers erhalten. Es wird nur gelöscht, wenn es ausdrücklich entfernt wird, beispielsweise mit `docker volume rm`, `docker compose down -v` oder einer entsprechenden Portainer-Aktion. `/data/saved` sollte zusätzlich außerhalb des Docker-Hosts gesichert werden.
 
-`IMAGE_TAG=latest` ist während der Entwicklung praktisch. Für stabilen Betrieb einen getesteten Release-Tag wie `v0.1.0` verwenden.
+Das Beispiel verwendet der Einfachheit halber `latest`. Für stabilen Betrieb in der `image:`-Zeile einen getesteten Release-Tag wie `v0.1.0` eintragen.
