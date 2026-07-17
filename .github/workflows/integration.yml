@@ -32,7 +32,7 @@ jobs:
         if: always()
         run: |
           docker exec no-one-survived-integration nosctl status || true
-          docker logs no-one-survived-integration || true
+          docker logs --tail 300 no-one-survived-integration || true
 
       - name: Stop test container
         if: always()

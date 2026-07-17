@@ -11,26 +11,23 @@ show_diagnostics() {
   echo "=== Integration container status ==="
   if docker inspect "$name" >/dev/null 2>&1; then
     docker exec "$name" nosctl status || true
-    echo "=== Integration container logs ==="
-    docker logs "$name" || true
+    echo "=== Integration container logs (last 300 lines) ==="
+    docker logs --tail 300 "$name" || true
   else
     echo "Integration container is unavailable" >&2
   fi
 }
 
-cleanup() {
+handle_exit() {
   local status=$?
   trap - EXIT
   if (( status != 0 )); then
     echo "Integration test failed with exit code ${status}" >&2
     show_diagnostics
   fi
-  if (( status == 0 )); then
-    docker rm -f "$name" >/dev/null 2>&1 || true
-  fi
   exit "$status"
 }
-trap cleanup EXIT
+trap handle_exit EXIT
 
 docker run -d \
   --name "$name" \
@@ -73,36 +70,29 @@ wait_for_state() {
   return 1
 }
 
-require_file() {
-  local path="$1" description="$2"
-  [[ -f "$path" ]] || {
-    echo "Missing ${description}: $path" >&2
+require_container_path() {
+  local test_flag="$1" path="$2" description="$3"
+  if ! docker exec "$name" test "$test_flag" "$path"; then
+    echo "Missing ${description} in container: $path" >&2
     return 1
-  }
+  fi
 }
 
-require_symlink() {
-  local path="$1" description="$2"
-  [[ -L "$path" ]] || {
-    echo "Missing ${description} symlink: $path" >&2
+require_container_symlink_target() {
+  local path="$1" expected_target="$2" description="$3" actual_target
+  actual_target="$(docker exec "$name" readlink -f "$path" 2>/dev/null || true)"
+  if [[ "$actual_target" != "$expected_target" ]]; then
+    echo "Invalid ${description} symlink in container: $path -> ${actual_target:-missing}; expected $expected_target" >&2
     return 1
-  }
-}
-
-require_directory() {
-  local path="$1" description="$2"
-  [[ -d "$path" ]] || {
-    echo "Missing ${description} directory: $path" >&2
-    return 1
-  }
+  fi
 }
 
 echo "Waiting for SteamCMD installation and sleeping state..."
 wait_for_state "SLEEPING" 5400
 
-require_file "$data_dir/server/WRSH/Binaries/Win64/WRSHServer.exe" "dedicated server executable"
-require_file "$data_dir/wine/system.reg" "Wine registry"
-require_symlink "$data_dir/server/WRSH/Saved" "persistent save"
+require_container_path -f /data/server/WRSH/Binaries/Win64/WRSHServer.exe "dedicated server executable"
+require_container_path -f /data/wine/system.reg "Wine registry"
+require_container_symlink_target /data/server/WRSH/Saved /data/saved "persistent save"
 
 echo "Sending UDP wake packet through the published query port..."
 python3 - <<'PY'
@@ -130,5 +120,5 @@ echo "Requesting graceful sleep..."
 docker exec "$name" nosctl sleep >/dev/null
 wait_for_state "SLEEPING" 180
 
-require_directory "$data_dir/saved" "persistent save"
+require_container_path -d /data/saved "persistent save directory"
 echo "Integration test completed"
