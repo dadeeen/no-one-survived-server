@@ -106,7 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           debian_ref=debian:trixie-slim
-          debian_digest="$(./scripts/resolve-image-digest.sh "$debian_ref")"
+          debian_digest="$(bash ./scripts/resolve-image-digest.sh "$debian_ref")"
           debian_image="${debian_ref}@${debian_digest}"
           echo "Resolved immutable Debian base: $debian_image"
           discovery_image="nos-release-discovery:${GITHUB_SHA}"
