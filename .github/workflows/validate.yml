@@ -85,6 +85,16 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Resolve immutable Debian base
+        id: base
+        run: |
+          set -euo pipefail
+          debian_ref=debian:trixie-slim
+          debian_digest="$(./scripts/resolve-image-digest.sh "$debian_ref")"
+          debian_image="${debian_ref}@${debian_digest}"
+          echo "Resolved immutable Debian base: $debian_image"
+          echo "image=$debian_image" >>"$GITHUB_OUTPUT"
+
       - name: Build linux/amd64 image
         uses: docker/build-push-action@v7
         with:
@@ -94,6 +104,7 @@ jobs:
           push: false
           tags: no-one-survived-server:ci
           build-args: |
+            DEBIAN_IMAGE=${{ steps.base.outputs.image }}
             VERSION=ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

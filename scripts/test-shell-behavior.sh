@@ -69,4 +69,37 @@ if DATA_DIR="$tmp/data" ./scripts/restore.sh "$tmp/link.tar.gz" >"$tmp/link.out"
 fi
 grep -q 'unsupported archive entry' "$tmp/link.out"
 
+mkdir -p "$tmp/bin"
+cat >"$tmp/bin/docker" <<'SH'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[[ "$*" == "buildx imagetools inspect debian:trixie-slim" ]]
+printf '%s\n' \
+  'Name:      docker.io/library/debian:trixie-slim' \
+  'MediaType: application/vnd.oci.image.index.v1+json' \
+  'Digest:    sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
+  '' \
+  'Manifests:'
+for index in $(seq 1 100); do
+  printf '  Name: manifest-%s\n' "$index"
+done
+SH
+chmod +x "$tmp/bin/docker"
+
+digest="$(PATH="$tmp/bin:$PATH" ./scripts/resolve-image-digest.sh debian:trixie-slim)"
+[[ "$digest" == "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ]]
+
+cat >"$tmp/bin/docker" <<'SH'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+printf '%s\n' 'Name: docker.io/library/debian:trixie-slim' 'MediaType: application/vnd.oci.image.index.v1+json'
+SH
+chmod +x "$tmp/bin/docker"
+if PATH="$tmp/bin:$PATH" ./scripts/resolve-image-digest.sh debian:trixie-slim >"$tmp/digest.out" 2>&1; then
+  echo "digest resolution without a digest unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -q 'No digest found in image manifest inspection' "$tmp/digest.out"
+
 echo "Shell behavior tests passed"
