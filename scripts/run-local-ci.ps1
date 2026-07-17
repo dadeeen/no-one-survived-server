@@ -133,6 +133,23 @@ function Wait-ContainerState {
     throw "Timed out waiting for container state: $($AllowedStates -join ', ')"
 }
 
+function Assert-ContainerSymlinkTarget {
+    param(
+        [Parameter(Mandatory)] [string]$ContainerName,
+        [Parameter(Mandatory)] [string]$Path,
+        [Parameter(Mandatory)] [string]$ExpectedTarget
+    )
+
+    $targetOutput = & docker exec $ContainerName readlink -f $Path
+    if ($LASTEXITCODE -ne 0 -or -not $targetOutput) {
+        throw "Could not resolve container symlink target: $Path"
+    }
+    $target = ($targetOutput -join "`n").Trim()
+    if ($target -ne $ExpectedTarget) {
+        throw "Container symlink target mismatch: $Path -> $target (expected $ExpectedTarget)"
+    }
+}
+
 $originalLocation = Get-Location
 $repoRoot = $null
 $worktree = $null
@@ -207,8 +224,8 @@ runuser -u nobody -- ./scripts/test-shell-behavior.sh
     Write-Host "`n== Compose and Portainer models =="
     Copy-Item .env.example .env -Force
     New-Item -ItemType Directory -Path secrets -Force | Out-Null
-    Set-Content -Path secrets/server_password.txt -Value "ci-server-password" -NoNewline
-    Set-Content -Path secrets/admin_password.txt -Value "ci-admin-password" -NoNewline
+    Set-Content -Path secrets/server_password.txt -Value "ci-server-test-value" -NoNewline
+    Set-Content -Path secrets/admin_password.txt -Value "ci-admin-test-value" -NoNewline
 
     Invoke-Native docker @(
         "compose", "-f", "compose.yaml", "-f", "compose.build.yaml", "config"
@@ -317,6 +334,10 @@ runuser -u nobody -- ./scripts/test-shell-behavior.sh
         Invoke-Native docker @(
             "exec", $integrationContainer, "test", "-L", "/data/server/WRSH/Saved"
         )
+        Assert-ContainerSymlinkTarget `
+            -ContainerName $integrationContainer `
+            -Path "/data/server/WRSH/Saved" `
+            -ExpectedTarget "/data/saved"
 
         Write-Host "Sending a UDP wake packet to host port $queryPort."
         $udp = [System.Net.Sockets.UdpClient]::new()

@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented here.
 
-The project has not published a tagged release yet.
-
 ## [Unreleased]
+
+## [0.1.0] - 2026-07-17
 
 ### Added
 
