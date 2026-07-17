@@ -26,7 +26,7 @@ jobs:
       - name: Run integration test
         env:
           FULL_RUNTIME: ${{ inputs.full_runtime }}
-        run: ./scripts/integration-test.sh
+        run: bash ./scripts/integration-test.sh
 
       - name: Show final state and logs
         if: always()
