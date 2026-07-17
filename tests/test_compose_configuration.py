@@ -150,9 +150,7 @@ class ComposeConfigurationTests(unittest.TestCase):
 
     def test_secret_delivery_is_explicit(self) -> None:
         keys = environment_keys(ROOT / "examples/portainer-stack.yaml")
-        self.assertTrue(
-            {"SERVER_PASSWORD_FILE", "ADMIN_PASSWORD_FILE"}.issubset(keys)
-        )
+        self.assertTrue({"SERVER_PASSWORD_FILE", "ADMIN_PASSWORD_FILE"}.issubset(keys))
         secret_overlay = (ROOT / "compose.secrets.yaml").read_text(encoding="utf-8")
         self.assertIn("SERVER_PASSWORD_FILE", secret_overlay)
         self.assertIn("ADMIN_PASSWORD_FILE", secret_overlay)
