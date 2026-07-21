@@ -47,6 +47,13 @@ class Supervisor:
             self.wake_event.set()
             return {"ok": True, "message": "wake requested"}
         if command == "sleep":
+            current = self.state.snapshot().get("state")
+            if current == "SLEEPING":
+                return {
+                    "ok": True,
+                    "message": "server already sleeping",
+                    "state": current,
+                }
             self.sleep_event.set()
             return {"ok": True, "message": "sleep requested"}
         return {"ok": False, "error": f"unknown command: {command}"}
@@ -157,10 +164,26 @@ class Supervisor:
         self.last_log_player_count = count
         self.state.update(log_players=count)
 
+    def _cancel_start_if_sleep_requested(self) -> bool:
+        if not self.sleep_event.is_set():
+            return False
+        self.sleep_event.clear()
+        self.state.set_state(
+            "SLEEPING",
+            players=0,
+            pid=None,
+            ready=False,
+            wake_source=None,
+        )
+        print("[supervisor] Start cancelled by sleep request", flush=True)
+        return True
+
     def start_server(self, wake_source: str | None = None) -> bool:
         self.wake_event.clear()
         if not self.prepared:
             self.prepare(update=not self.settings.executable.exists())
+        if self._cancel_start_if_sleep_requested():
+            return False
         if self.settings.update_on_wake:
             try:
                 self.perform_update(required=False)
@@ -182,7 +205,8 @@ class Supervisor:
                 return False
             ensure_saved_link(self.settings)
             apply_configuration(self.settings)
-        self.sleep_event.clear()
+        if self._cancel_start_if_sleep_requested():
+            return False
         self.last_log_player_count = 0
         self.state.set_state(
             "STARTING",
