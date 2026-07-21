@@ -113,6 +113,7 @@ def build_updates() -> tuple[dict[str, dict[str, str]], list[str]]:
         applied.append(f"{section}.{key}" + (" (secret)" if secret else ""))
 
     extra = read_json_object("GAME_INI_OVERRIDES")
+    json_override_applied = False
     for section, values in extra.items():
         if not isinstance(section, str) or not isinstance(values, dict):
             raise SettingsError("GAME_INI_OVERRIDES must map section names to objects")
@@ -139,7 +140,9 @@ def build_updates() -> tuple[dict[str, dict[str, str]], list[str]]:
                 rendered = str(value)
             rendered = _identity(rendered)
             updates.setdefault(section, {})[key] = rendered
-            applied.append(f"{section}.{key} (JSON override)")
+            json_override_applied = True
+    if json_override_applied:
+        applied.append("GAME_INI_OVERRIDES")
     return updates, applied
 
 
@@ -165,9 +168,7 @@ def apply_configuration(settings: Settings) -> list[str]:
         secret_path = settings.state_dir / "generated-admin-password"
         secret_path.write_text(generated + "\n", encoding="utf-8")
         secret_path.chmod(0o600)
-        applied.append(
-            f"ServerSetting.AdminPassword (generated; stored in {secret_path})"
-        )
+        applied.append("ServerSetting.AdminPassword (generated)")
     merge_ini(settings.game_ini, updates, settings.template_game_ini)
     settings.game_ini.chmod(0o600)
     merge_ini(
