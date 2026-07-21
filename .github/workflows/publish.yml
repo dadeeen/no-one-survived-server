@@ -68,7 +68,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          exact_image="${REGISTRY}/${IMAGE_NAME}:${GITHUB_REF_NAME}"
+          release_version="${GITHUB_REF_NAME#v}"
+          exact_image="${REGISTRY}/${IMAGE_NAME}:${release_version}"
           set +e
           manifest_output="$(docker manifest inspect "$exact_image" 2>&1)"
           manifest_status=$?
@@ -92,7 +93,6 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=sha-
