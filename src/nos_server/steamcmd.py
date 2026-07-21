@@ -206,8 +206,10 @@ def update_server(
     try:
         _update_server(settings, heartbeat)
     except UpdateError:
+        _write_timestamp(settings.update_attempt_stamp)
         raise
     except (OSError, subprocess.SubprocessError) as exc:
+        _write_timestamp(settings.update_attempt_stamp)
         raise UpdateError(f"SteamCMD operation failed: {exc}") from exc
 
 
