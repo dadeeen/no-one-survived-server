@@ -150,7 +150,7 @@ class RuntimeImageTests(unittest.TestCase):
                     msg=f"mutable action ref in {workflow_path.name}: {ref}",
                 )
 
-    def test_release_workflow_is_tag_gated_and_pins_primary_inputs(self) -> None:
+    def test_release_workflow_is_tag_gated_and_controls_primary_inputs(self) -> None:
         workflow = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
         self.assertIn('tags: ["v*"]', workflow)
         self.assertNotIn("branches: [main]", workflow)
@@ -168,20 +168,14 @@ class RuntimeImageTests(unittest.TestCase):
             "WINE_PACKAGE_VERSION=${{ steps.pins.outputs.wine_package_version }}",
             workflow,
         )
-        self.assertIn("STEAMCMD_SHA256=${{ env.STEAMCMD_SHA256 }}", workflow)
-        self.assertRegex(
-            workflow,
-            r"(?m)^  STEAMCMD_SHA256: [0-9a-f]{64}$",
-        )
-        self.assertIn('--build-arg "STEAMCMD_SHA256=$STEAMCMD_SHA256"', workflow)
-        self.assertNotIn("steamcmd_sha256=", workflow)
+        self.assertNotIn("STEAMCMD_SHA256", workflow)
         self.assertGreaterEqual(workflow.count("--no-cache"), 2)
         self.assertIn('cache-to "type=local', workflow)
         self.assertIn("cache-from: type=local", workflow)
         self.assertNotIn("cache-from: type=gha", workflow)
         self.assertLess(
-            workflow.index("Resolve and smoke-test immutable upstream inputs"),
-            workflow.index("Build and push pinned image"),
+            workflow.index("Resolve and smoke-test release inputs"),
+            workflow.index("Build and push release image"),
         )
 
     def test_ci_validates_secret_overlay_and_local_runner(self) -> None:
