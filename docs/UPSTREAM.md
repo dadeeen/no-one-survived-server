@@ -27,7 +27,7 @@ Sources:
 - <https://dl.winehq.org/wine-builds/debian/>
 - <https://developer.valvesoftware.com/wiki/SteamCMD>
 
-`WINE_MAJOR=11` selects the newest available stable Wine 11 package during an ordinary build. The release workflow resolves an immutable Debian image digest, records the exact WineHQ package version and SteamCMD archive SHA-256 from a discovery image, rebuilds with those primary inputs pinned and smoke-tests the candidate before publication.
+`WINE_MAJOR=11` selects the newest available stable Wine 11 package during an ordinary build. The WineHQ repository key fingerprint and SteamCMD archive SHA-256 are pinned in the repository. The release workflow resolves an immutable Debian image digest, records the exact authenticated WineHQ package version, rebuilds with those inputs pinned and smoke-tests the candidate before publication.
 
 The resolved Wine package version and downloaded SteamCMD archive hash are stored inside the image at `/usr/local/share/nos/wine-package-version` and `/usr/local/share/nos/steamcmd-bootstrap-sha256`.
 
