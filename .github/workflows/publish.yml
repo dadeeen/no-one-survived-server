@@ -18,7 +18,6 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  STEAMCMD_SHA256: cebf0046bfd08cf45da6bc094ae47aa39ebf4155e5ede41373b579b8f1071e7c
 
 jobs:
   publish:
@@ -99,7 +98,7 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ steps.release.outputs.publish_latest }}
 
-      - name: Resolve and smoke-test immutable upstream inputs
+      - name: Resolve and smoke-test release inputs
         id: pins
         shell: bash
         env:
@@ -119,7 +118,6 @@ jobs:
             --load \
             --tag "$discovery_image" \
             --build-arg "DEBIAN_IMAGE=$debian_image" \
-            --build-arg "STEAMCMD_SHA256=$STEAMCMD_SHA256" \
             --build-arg "VERSION=discovery-${GITHUB_SHA}" \
             .
 
@@ -141,7 +139,6 @@ jobs:
             --build-arg "WINE_DIST=trixie" \
             --build-arg "WINE_MAJOR=11" \
             --build-arg "WINE_PACKAGE_VERSION=$wine_package_version" \
-            --build-arg "STEAMCMD_SHA256=$STEAMCMD_SHA256" \
             --build-arg "VERSION=$RELEASE_VERSION" \
             .
 
@@ -153,7 +150,7 @@ jobs:
             echo "wine_package_version=$wine_package_version"
           } >>"$GITHUB_OUTPUT"
 
-      - name: Build and push pinned image
+      - name: Build and push release image
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
@@ -167,7 +164,6 @@ jobs:
             WINE_DIST=trixie
             WINE_MAJOR=11
             WINE_PACKAGE_VERSION=${{ steps.pins.outputs.wine_package_version }}
-            STEAMCMD_SHA256=${{ env.STEAMCMD_SHA256 }}
             VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=local,src=${{ runner.temp }}/nos-release-cache
           provenance: mode=max
@@ -180,9 +176,8 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
-      - name: Report published digest and pins
+      - name: Report published digest and resolved inputs
         run: |
           echo "digest=${{ steps.build.outputs.digest }}"
           echo "debian=${{ steps.pins.outputs.debian_image }}"
           echo "wine=${{ steps.pins.outputs.wine_package_version }}"
-          echo "steamcmd=${{ env.STEAMCMD_SHA256 }}"
