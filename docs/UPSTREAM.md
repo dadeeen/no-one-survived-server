@@ -27,10 +27,10 @@ Sources:
 - <https://dl.winehq.org/wine-builds/debian/>
 - <https://developer.valvesoftware.com/wiki/SteamCMD>
 
-`WINE_MAJOR=11` selects the newest available stable Wine 11 package during an ordinary build. The WineHQ repository key fingerprint and SteamCMD archive SHA-256 are pinned in the repository. The release workflow resolves an immutable Debian image digest, records the exact authenticated WineHQ package version, rebuilds with those inputs pinned and smoke-tests the candidate before publication.
+`WINE_MAJOR=11` selects the newest available stable Wine 11 package during an ordinary build. The WineHQ repository key fingerprint is pinned in the repository. The release workflow resolves an immutable Debian image digest, records the exact authenticated WineHQ package version, rebuilds with those controlled inputs and smoke-tests the candidate before publication. SteamCMD follows Valve's official bootstrap URL instead of being release-pinned to one archive hash.
 
 The resolved Wine package version and downloaded SteamCMD archive hash are stored inside the image at `/usr/local/share/nos/wine-package-version` and `/usr/local/share/nos/steamcmd-bootstrap-sha256`.
 
-The primary pins make the selected Debian image, Wine package and SteamCMD archive explicit. They do not freeze Debian repository metadata or every transitive APT package through a historical snapshot, so releases are not claimed to be byte-for-byte reproducible when rebuilt at arbitrary future dates.
+The primary pins make the selected Debian image and Wine package explicit. The downloaded SteamCMD archive hash is recorded in the image for traceability, but the release does not require a repository-pinned SteamCMD hash. Debian repository metadata and every transitive APT package are likewise not frozen through a historical snapshot, so releases are not claimed to be byte-for-byte reproducible when rebuilt at arbitrary future dates.
 
 Before each release, compare the game-specific upstream files for changed executable paths, ports, command-line arguments, configuration keys, readiness patterns or Wine recommendations. The image smoke test must also confirm SteamCMD startup, amd64/i386 runtime support and creation of a fresh Wine prefix. A real game-server integration run remains required for production confidence; the PowerShell procedure is documented under [Local CI](LOCAL-CI.md).
