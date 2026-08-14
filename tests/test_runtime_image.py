@@ -17,6 +17,15 @@ class RuntimeImageTests(unittest.TestCase):
         self.assertNotIn("cubecoders", dockerfile.lower())
         self.assertNotIn("ampstart", dockerfile.lower())
 
+    def test_runtime_authenticates_winehq_trust_material(self) -> None:
+        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn(
+            'test "${actual_winehq_key_fingerprint}" = "D43F640145369C51D786DDEA76F1A20FF987672F"',
+            dockerfile,
+        )
+        self.assertIn("URIs: https://dl.winehq.org/wine-builds/debian", dockerfile)
+        self.assertNotIn("winehq-${WINE_DIST}.sources", dockerfile)
+
     def test_runtime_installs_trust_store_before_enabling_winehq(self) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
         runtime = dockerfile.split("\nFROM ${DEBIAN_IMAGE}\n", 1)[1]
@@ -123,6 +132,19 @@ class RuntimeImageTests(unittest.TestCase):
         self.assertNotIn("[switch]$SkipAudit", local_runner)
         self.assertIn("sys.version_info[:2] == (3, 13)", dockerfile)
 
+    def test_workflow_actions_are_pinned_to_commits(self) -> None:
+        for workflow_path in sorted((ROOT / ".github/workflows").glob("*.yml")):
+            workflow = workflow_path.read_text(encoding="utf-8")
+            for line in workflow.splitlines():
+                if "uses:" not in line:
+                    continue
+                ref = line.split("uses:", 1)[1].strip().split()[0]
+                self.assertRegex(
+                    ref,
+                    r"^[^@\s]+@[0-9a-f]{40}$",
+                    msg=f"mutable action ref in {workflow_path.name}: {ref}",
+                )
+
     def test_release_workflow_is_tag_gated_and_pins_primary_inputs(self) -> None:
         workflow = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
         self.assertIn('tags: ["v*"]', workflow)
@@ -141,9 +163,13 @@ class RuntimeImageTests(unittest.TestCase):
             "WINE_PACKAGE_VERSION=${{ steps.pins.outputs.wine_package_version }}",
             workflow,
         )
-        self.assertIn(
-            "STEAMCMD_SHA256=${{ steps.pins.outputs.steamcmd_sha256 }}", workflow
+        self.assertIn("STEAMCMD_SHA256=${{ env.STEAMCMD_SHA256 }}", workflow)
+        self.assertRegex(
+            workflow,
+            r"(?m)^  STEAMCMD_SHA256: [0-9a-f]{64}$",
         )
+        self.assertIn('--build-arg "STEAMCMD_SHA256=$STEAMCMD_SHA256"', workflow)
+        self.assertNotIn("steamcmd_sha256=", workflow)
         self.assertGreaterEqual(workflow.count("--no-cache"), 2)
         self.assertIn('cache-to "type=local', workflow)
         self.assertIn("cache-from: type=local", workflow)
