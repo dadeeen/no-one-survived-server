@@ -29,7 +29,7 @@ RUN set -eux; \
         "Suites: ${WINE_DIST}" \
         'Components: main' \
         'Architectures: amd64 i386' \
-        'Signed-By: /etc/apt/keyrings/winehq-archive.key' \
+        'Signed-By: /etc/apt/keyrings/winehq-archive.key D43F640145369C51D786DDEA76F1A20FF987672F' \
         >/assets/winehq.sources; \
     curl -fsSL --retry 5 --retry-all-errors \
         "${STEAMCMD_URL}" -o /tmp/steamcmd.tar.gz; \
