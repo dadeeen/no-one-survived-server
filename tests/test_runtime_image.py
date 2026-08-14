@@ -24,6 +24,11 @@ class RuntimeImageTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn("URIs: https://dl.winehq.org/wine-builds/debian", dockerfile)
+        self.assertIn(
+            "Signed-By: /etc/apt/keyrings/winehq-archive.key "
+            "D43F640145369C51D786DDEA76F1A20FF987672F",
+            dockerfile,
+        )
         self.assertNotIn("winehq-${WINE_DIST}.sources", dockerfile)
 
     def test_runtime_installs_trust_store_before_enabling_winehq(self) -> None:
