@@ -177,6 +177,13 @@ class RuntimeImageTests(unittest.TestCase):
             workflow.index("Resolve and smoke-test release inputs"),
             workflow.index("Build and push release image"),
         )
+        self.assertIn("name: GitHub release", workflow)
+        self.assertIn("needs: publish", workflow)
+        self.assertIn("contents: write", workflow)
+        self.assertIn('gh release create "${GITHUB_REF_NAME}"', workflow)
+        self.assertIn("--verify-tag", workflow)
+        self.assertIn("--generate-notes", workflow)
+        self.assertIn("release_flags+=(--prerelease)", workflow)
 
     def test_ci_validates_secret_overlay_and_local_runner(self) -> None:
         workflow = (ROOT / ".github/workflows/validate.yml").read_text(encoding="utf-8")
