@@ -181,3 +181,28 @@ jobs:
           echo "digest=${{ steps.build.outputs.digest }}"
           echo "debian=${{ steps.pins.outputs.debian_image }}"
           echo "wine=${{ steps.pins.outputs.wine_package_version }}"
+
+  release:
+    name: GitHub release
+    needs: publish
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Publish GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_flags=()
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "${GITHUB_REF_NAME}" \
+            --verify-tag \
+            --generate-notes \
+            --title "No One Survived Server ${GITHUB_REF_NAME}" \
+            "${release_flags[@]}"
