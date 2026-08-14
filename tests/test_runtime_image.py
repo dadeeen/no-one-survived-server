@@ -163,12 +163,16 @@ class RuntimeImageTests(unittest.TestCase):
             "WINE_PACKAGE_VERSION=${{ steps.pins.outputs.wine_package_version }}",
             workflow,
         )
-        self.assertIn("STEAMCMD_SHA256=${{ env.STEAMCMD_SHA256 }}", workflow)
+        self.assertIn(
+            "STEAMCMD_SHA256=${{ env.STEAMCMD_SHA256 }}", workflow
+        )
         self.assertRegex(
             workflow,
             r"(?m)^  STEAMCMD_SHA256: [0-9a-f]{64}$",
         )
-        self.assertIn('--build-arg "STEAMCMD_SHA256=$STEAMCMD_SHA256"', workflow)
+        self.assertIn(
+            '--build-arg "STEAMCMD_SHA256=$STEAMCMD_SHA256"', workflow
+        )
         self.assertNotIn("steamcmd_sha256=", workflow)
         self.assertGreaterEqual(workflow.count("--no-cache"), 2)
         self.assertIn('cache-to "type=local', workflow)
