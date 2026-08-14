@@ -18,11 +18,19 @@ RUN set -eux; \
     curl -fsSL --retry 5 --retry-all-errors \
         https://dl.winehq.org/wine-builds/winehq.key \
         -o /tmp/winehq.key; \
+    actual_winehq_key_fingerprint="$(gpg --batch --show-keys --with-colons /tmp/winehq.key \
+        | awk -F: '$1 == "fpr" { print $10; exit }')"; \
+    test "${actual_winehq_key_fingerprint}" = "D43F640145369C51D786DDEA76F1A20FF987672F"; \
     gpg --batch --yes --dearmor \
         --output /assets/winehq-archive.key /tmp/winehq.key; \
-    curl -fsSL --retry 5 --retry-all-errors \
-        "https://dl.winehq.org/wine-builds/debian/dists/${WINE_DIST}/winehq-${WINE_DIST}.sources" \
-        -o /assets/winehq.sources; \
+    printf '%s\n' \
+        'Types: deb' \
+        'URIs: https://dl.winehq.org/wine-builds/debian' \
+        "Suites: ${WINE_DIST}" \
+        'Components: main' \
+        'Architectures: amd64 i386' \
+        'Signed-By: /etc/apt/keyrings/winehq-archive.key D43F640145369C51D786DDEA76F1A20FF987672F' \
+        >/assets/winehq.sources; \
     curl -fsSL --retry 5 --retry-all-errors \
         "${STEAMCMD_URL}" -o /tmp/steamcmd.tar.gz; \
     actual_steamcmd_sha256="$(sha256sum /tmp/steamcmd.tar.gz | awk '{print $1}')"; \
