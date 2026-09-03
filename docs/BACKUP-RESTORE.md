@@ -2,7 +2,7 @@
 
 [Deutsch](BACKUP-RESTORE.de.md) · [Back to README](../README.md)
 
-The irreplaceable data is `/data/saved`. Server files, SteamCMD and the Wine prefix can be recreated.
+The irreplaceable data is `SAVED_DIR` (`/data/saved` by default). Server files, SteamCMD and the Wine prefix can be recreated.
 
 ## Consistent backup
 
@@ -19,7 +19,7 @@ Wait for `SLEEPING`, then run:
 docker exec no-one-survived nos-backup
 ```
 
-The backup helper drops root privileges automatically and writes archives with the configured runtime ownership. The default target is `/data/backups`, with five retained archives. Override `KEEP_BACKUPS` or `BACKUP_DIR` through `docker exec --env` when needed.
+The backup helper drops root privileges automatically and backs up the configured `SAVED_DIR`. Backup archives and newly created backup directories are private from creation (`0600` and `0700`) even when invoked through `docker exec`. The default target is `/data/backups`, with five retained archives. Override `KEEP_BACKUPS` or `BACKUP_DIR` through `docker exec --env` when needed. `KEEP_BACKUPS=0` disables retention pruning and keeps all archives.
 
 A backup inside the same Docker volume protects against bad updates but not against host/volume loss. Copy archives to NAS or another backup system.
 
@@ -34,4 +34,4 @@ A backup inside the same Docker volume protects against bad updates but not agai
    docker exec no-one-survived nos-restore /data/backups/saved-YYYY-MM-DD_HH-MM-SS.tar.gz
    ```
 
-The restore helper validates the complete archive before changing live data, rejects paths outside `saved/`, links and special files, and extracts into a staging directory. It then renames the existing `/data/saved` directory to `saved.before-restore.<timestamp>.<pid>`, moves the restored directory into place on the same volume, and applies the configured `PUID`/`PGID` when invoked through the normal root-level `docker exec` command.
+The restore helper uses a private staging tree (`umask 0077`), validates the complete archive before changing live data, rejects paths outside `saved/`, links and special files, and extracts into a staging directory. It then renames the existing `SAVED_DIR` to a sibling `<name>.before-restore.<timestamp>.<pid>`, moves the restored directory into place on the same volume, and applies the configured `PUID`/`PGID` when invoked through the normal root-level `docker exec` command.

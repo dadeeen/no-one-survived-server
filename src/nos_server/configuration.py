@@ -98,6 +98,26 @@ MAPPINGS: dict[str, tuple[str, str, Callable[[str], str], bool]] = {
     "NPC_ITEM_SPAWN": ("GameSettings", "NPCItemSpawn", _float_range(0.1, 10), False),
 }
 
+MANAGED_INI_KEYS = {
+    (section.strip().casefold(), key.strip().casefold())
+    for section, key, _convert, _secret in MAPPINGS.values()
+}
+
+
+def _write_private_text(path: os.PathLike[str] | str, text: str) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            handle.write(text)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
 
 def build_updates() -> tuple[dict[str, dict[str, str]], list[str]]:
     updates: dict[str, dict[str, str]] = {}
@@ -130,6 +150,12 @@ def build_updates() -> tuple[dict[str, dict[str, str]], list[str]]:
                 character in key for character in ("\r", "\n", "\x00", "=")
             ):
                 raise SettingsError(f"Invalid INI key in GAME_INI_OVERRIDES: {key!r}")
+            normalized_key = (section.strip().casefold(), key.strip().casefold())
+            if normalized_key in MANAGED_INI_KEYS:
+                raise SettingsError(
+                    "GAME_INI_OVERRIDES must not override managed setting "
+                    f"{section}.{key}; use the dedicated environment variable instead"
+                )
             if isinstance(value, float) and not math.isfinite(value):
                 raise SettingsError("GAME_INI_OVERRIDES numeric values must be finite")
             if isinstance(value, bool):
@@ -166,8 +192,7 @@ def apply_configuration(settings: Settings) -> list[str]:
         server_updates["AdminPassword"] = generated
         settings.state_dir.mkdir(parents=True, exist_ok=True)
         secret_path = settings.state_dir / "generated-admin-password"
-        secret_path.write_text(generated + "\n", encoding="utf-8")
-        secret_path.chmod(0o600)
+        _write_private_text(secret_path, generated + "\n")
         applied.append("ServerSetting.AdminPassword (generated)")
     merge_ini(settings.game_ini, updates, settings.template_game_ini)
     settings.game_ini.chmod(0o600)

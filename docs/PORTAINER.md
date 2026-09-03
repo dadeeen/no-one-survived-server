@@ -25,7 +25,7 @@ Image name:
 ghcr.io/dadeeen/no-one-survived-server:latest
 ```
 
-For stable operation, replace `latest` in the stack with a tested release tag such as `v0.1.0`.
+For stable operation, replace `latest` in the stack with a tested release tag such as `0.1.0`.
 
 ## Editing the stack
 

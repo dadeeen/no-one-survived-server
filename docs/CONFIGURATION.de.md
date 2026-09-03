@@ -133,6 +133,8 @@ Zukünftige oder seltene Einstellungen können über `GAME_INI_OVERRIDES` als JS
 GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"AnotherValue":2}}
 ```
 
+`GAME_INI_OVERRIDES` ist bewusst auf Schlüssel beschränkt, die nicht bereits über die oben aufgeführten dedizierten Umgebungsvariablen verwaltet werden. Eine Kollision mit einem verwalteten Schlüssel wird unabhängig von Groß-/Kleinschreibung abgelehnt, statt Werte wie `Password` oder `AdminPassword` still zu überschreiben.
+
 Für komplexes oder sensibles JSON steht `GAME_INI_OVERRIDES_FILE` zur Verfügung. Die referenzierte Datei muss in den Container eingebunden und für die konfigurierte `PUID` lesbar sein; die mitgelieferten Beispiele binden beliebige Override-Dateien nicht automatisch ein.
 
 ### Passwörter
@@ -163,15 +165,15 @@ Leere direkte Passwortvariablen gelten als nicht gesetzt, damit optionale Compos
 | `UMASK` | `0027` | Dateirechtemaske der Laufzeit; `Game.ini` wird zusätzlich auf `0600` gesetzt. |
 | `FIX_PERMISSIONS` | `true` | Eigentümer einmal je UID/GID-Kombination rekursiv setzen; Marker liegt in `/data`. Akzeptiert dieselben Boolean-Schreibweisen wie die Python-Einstellungen. |
 
-Die mitgelieferten Compose- und Portainer-Stacks binden das benannte Volume bewusst unter `/data` ein und stellen keine alternativen persistenten Wurzelpfade bereit. `DATA_DIR`, `SERVER_DIR`, `SAVED_DIR`, `STATE_DIR`, `STEAMCMD_DIR` und `WINEPREFIX` bleiben für benutzerdefinierte `docker run`- oder abgeleitete Image-Integrationen verfügbar. Jeder persistente Pfad muss absolut sein und unterhalb von `DATA_DIR` liegen.
+Die mitgelieferten Compose- und Portainer-Stacks binden das benannte Volume bewusst unter `/data` ein und stellen keine alternativen persistenten Wurzelpfade bereit. `DATA_DIR`, `SERVER_DIR`, `SAVED_DIR`, `STATE_DIR`, `STEAMCMD_DIR` und `WINEPREFIX` bleiben für benutzerdefinierte `docker run`- oder abgeleitete Image-Integrationen verfügbar. Jeder persistente Pfad muss absolut sein und ein echtes Unterverzeichnis von `DATA_DIR` bilden. `SAVED_DIR` darf `SERVER_DIR` nicht überlappen; `WINEPREFIX` darf Server-, Save-, SteamCMD- oder State-Verzeichnisse nicht überlappen und `HOME` nicht enthalten.
 
 ## Steuerung und Healthcheck
 
 | Variable | Standard | Bedeutung |
 |---|---:|---|
 | `RUNTIME_DIR` | `/run/nos` | Flüchtiges Laufzeitverzeichnis. Muss absolut sein. |
-| `STATE_FILE` | `<RUNTIME_DIR>/state.json` | Optionale absolute Abweichung für die Statusdatei. Leer behält den abgeleiteten Standard. |
-| `CONTROL_SOCKET` | `<RUNTIME_DIR>/control.sock` | Optionale absolute Abweichung für den Steuer-Socket. Leer behält den abgeleiteten Standard. Ein vorhandener Pfad, der kein Socket ist, wird niemals gelöscht. |
+| `STATE_FILE` | `<RUNTIME_DIR>/state.json` | Optionale absolute Abweichung für die Statusdatei. Leer behält den abgeleiteten Standard. Laufzeit-Endpunkte dürfen nicht unterhalb der Server-, Savegame-, Wine-Prefix- oder SteamCMD-Verzeichnisse liegen. |
+| `CONTROL_SOCKET` | `<RUNTIME_DIR>/control.sock` | Optionale absolute Abweichung für den Steuer-Socket. Leer behält den abgeleiteten Standard. Ein vorhandener Pfad, der kein Socket ist, wird niemals gelöscht; Laufzeit-Endpunkte dürfen nicht unterhalb der Server-, Savegame-, Wine-Prefix- oder SteamCMD-Verzeichnisse liegen. |
 | `NOSCTL_TIMEOUT_SECONDS` | `5` | Maximale Verbindungs- und Lesezeit eines `nosctl`-Aufrufs. Muss eine positive endliche Zahl sein. |
 | `HEALTHCHECK_MAX_HEARTBEAT_AGE` | `600` | Maximales Alter des Heartbeats in Sekunden, bevor der Container als ungesund gilt. |
 

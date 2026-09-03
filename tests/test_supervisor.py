@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import signal
+import socket
 import tempfile
 import threading
 import time
@@ -47,8 +49,35 @@ class FakeServer:
     def stop(self) -> int:
         return 0
 
+    def close(self) -> None:
+        return None
+
 
 class SupervisorTests(unittest.TestCase):
+    def test_signals_use_same_idempotency_as_control_commands(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {"DATA_DIR": directory, "RUNTIME_DIR": f"{directory}/runtime"},
+                clear=True,
+            ),
+        ):
+            supervisor = Supervisor(Settings.from_env())
+            state = FakeState()
+            supervisor.state = state  # type: ignore[assignment]
+            with patch("nos_server.supervisor.signal.signal") as register:
+                supervisor.install_signal_handlers()
+            handlers = {call.args[0]: call.args[1] for call in register.call_args_list}
+
+            state.set_state("RUNNING")
+            handlers[signal.SIGUSR1](signal.SIGUSR1, None)
+            self.assertFalse(supervisor.wake_event.is_set())
+
+            state.set_state("SLEEPING")
+            handlers[signal.SIGUSR2](signal.SIGUSR2, None)
+            self.assertFalse(supervisor.sleep_event.is_set())
+
     def test_manual_wake_is_not_lost_during_arm_delay(self) -> None:
         with (
             tempfile.TemporaryDirectory() as directory,
@@ -89,6 +118,66 @@ class SupervisorTests(unittest.TestCase):
         self.assertTrue(response["ok"])
         self.assertEqual(response["message"], "server already active")
         self.assertFalse(supervisor.wake_event.is_set())
+
+    def test_wake_during_wake_update_is_not_queued_for_later(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {
+                    "DATA_DIR": directory,
+                    "RUNTIME_DIR": f"{directory}/runtime",
+                    "UPDATE_ON_WAKE": "true",
+                },
+                clear=True,
+            ),
+        ):
+            supervisor = Supervisor(Settings.from_env())
+            supervisor.prepared = True
+            responses: list[dict[str, object]] = []
+
+            def update(*_args: object, **_kwargs: object) -> bool:
+                supervisor.state.set_state("UPDATING")
+                responses.append(supervisor.dispatch_control("wake"))
+                return True
+
+            with (
+                patch.object(supervisor, "perform_update", side_effect=update),
+                patch("nos_server.supervisor.ensure_saved_link"),
+                patch("nos_server.supervisor.apply_configuration"),
+                patch("nos_server.supervisor.ServerProcess") as server_process,
+            ):
+                server_process.return_value.start.return_value = 123
+                started = supervisor.start_server("manual")
+
+        self.assertTrue(started)
+        self.assertEqual(responses[0]["message"], "server already active")
+        self.assertFalse(supervisor.wake_event.is_set())
+
+    def test_manual_sleep_is_consumed_before_immediate_wake(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {
+                    "DATA_DIR": directory,
+                    "RUNTIME_DIR": f"{directory}/runtime",
+                    "WAKE_ARM_DELAY_SECONDS": "30",
+                    "WAKE_ON_GAME_PORT": "false",
+                    "WAKE_ON_QUERY_PORT": "false",
+                },
+                clear=True,
+            ),
+        ):
+            supervisor = Supervisor(Settings.from_env())
+            supervisor.server = FakeServer()  # type: ignore[assignment]
+            supervisor.sleep_event.set()
+            self.assertEqual(supervisor.monitor_server(), "sleep")
+            self.assertFalse(supervisor.sleep_event.is_set())
+
+            supervisor.wake_event.set()
+            self.assertEqual(supervisor.wait_for_wake(), "manual")
+            self.assertFalse(supervisor.sleep_event.is_set())
 
     def test_initial_update_failure_retries_without_exiting(self) -> None:
         with (
@@ -152,6 +241,45 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(snapshot["state"], "ERROR")
         wait.assert_called_once_with(5)
 
+    def test_wake_during_failed_wake_update_backoff_is_preserved(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {
+                    "DATA_DIR": directory,
+                    "RUNTIME_DIR": f"{directory}/runtime",
+                    "UPDATE_ON_WAKE": "true",
+                    "UPDATE_RETRY_DELAY_SECONDS": "5",
+                },
+                clear=True,
+            ),
+        ):
+            supervisor = Supervisor(Settings.from_env())
+            supervisor.prepared = True
+
+            def request_wake_during_backoff(_seconds: float) -> bool:
+                response = supervisor.dispatch_control("wake")
+                self.assertEqual(response["message"], "wake requested")
+                return False
+
+            with (
+                patch.object(
+                    supervisor,
+                    "perform_update",
+                    side_effect=UpdateError("Steam unavailable"),
+                ),
+                patch.object(
+                    supervisor.shutdown_event,
+                    "wait",
+                    side_effect=request_wake_during_backoff,
+                ),
+            ):
+                result = supervisor.start_server("test wake")
+
+        self.assertFalse(result)
+        self.assertTrue(supervisor.wake_event.is_set())
+
     def test_periodic_update_failure_keeps_sleeping(self) -> None:
         with (
             tempfile.TemporaryDirectory() as directory,
@@ -187,6 +315,57 @@ class SupervisorTests(unittest.TestCase):
             snapshot = supervisor.state.snapshot()
         self.assertEqual(result, "shutdown")
         self.assertEqual(snapshot["state"], "SLEEPING")
+
+    def test_periodic_update_keeps_wake_socket_bound(self) -> None:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.bind(("127.0.0.1", 0))
+            query_port = probe.getsockname()[1]
+        game_port = query_port + 1 if query_port < 65535 else query_port - 1
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {
+                    "DATA_DIR": directory,
+                    "RUNTIME_DIR": f"{directory}/runtime",
+                    "GAME_PORT": str(game_port),
+                    "QUERY_PORT": str(query_port),
+                    "WAKE_BIND_ADDRESS": "127.0.0.1",
+                    "WAKE_ON_GAME_PORT": "false",
+                    "WAKE_ON_QUERY_PORT": "true",
+                },
+                clear=True,
+            ),
+        ):
+            supervisor = Supervisor(Settings.from_env())
+            socket_was_bound = False
+
+            def update(*_args: object, **_kwargs: object) -> bool:
+                nonlocal socket_was_bound
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as competing:
+                    try:
+                        competing.bind(("127.0.0.1", query_port))
+                    except OSError:
+                        socket_was_bound = True
+                return True
+
+            def stop_after_wait(*_args: object, **_kwargs: object) -> None:
+                supervisor.shutdown_event.set()
+
+            with (
+                patch("nos_server.supervisor.update_due", return_value=True),
+                patch.object(supervisor, "perform_update", side_effect=update),
+                patch("nos_server.supervisor.ensure_saved_link"),
+                patch("nos_server.supervisor.apply_configuration"),
+                patch(
+                    "nos_server.supervisor.WakeListener.wait",
+                    side_effect=stop_after_wait,
+                ),
+            ):
+                result = supervisor.wait_for_wake()
+
+        self.assertEqual(result, "shutdown")
+        self.assertTrue(socket_was_bound)
 
     def test_control_start_failure_is_reported_as_error(self) -> None:
         with (

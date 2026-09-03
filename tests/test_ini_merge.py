@@ -46,6 +46,23 @@ class IniMergeTests(unittest.TestCase):
                 "[ServerSetting]\nServerName=Configured\n",
             )
 
+    def test_case_variant_sections_are_merged_instead_of_replaced(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "Game.ini"
+            merge_ini(
+                path,
+                {
+                    "ServerSetting": {"Password": "secret", "AdminPassword": "admin"},
+                    "serversetting": {"FutureSetting": "enabled"},
+                },
+            )
+            result = path.read_text(encoding="utf-8")
+        self.assertIn("[ServerSetting]", result)
+        self.assertIn("Password=secret", result)
+        self.assertIn("AdminPassword=admin", result)
+        self.assertIn("FutureSetting=enabled", result)
+        self.assertNotIn("[serversetting]", result)
+
 
 if __name__ == "__main__":
     unittest.main()

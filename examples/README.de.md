@@ -92,4 +92,4 @@ docker volume ls --filter name=no-one-survived
 
 Das Volume bleibt bei einer Neuerstellung oder Aktualisierung des Containers erhalten. Es wird nur gelöscht, wenn es ausdrücklich entfernt wird, beispielsweise mit `docker volume rm`, `docker compose down -v` oder einer entsprechenden Portainer-Aktion. `/data/saved` sollte zusätzlich außerhalb des Docker-Hosts gesichert werden.
 
-Das Beispiel verwendet der Einfachheit halber `latest`. Für stabilen Betrieb in der `image:`-Zeile einen getesteten Release-Tag wie `v0.1.0` eintragen.
+Das Beispiel verwendet der Einfachheit halber `latest`. Für stabilen Betrieb in der `image:`-Zeile einen getesteten Release-Tag wie `0.1.0` eintragen.

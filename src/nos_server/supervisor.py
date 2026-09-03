@@ -30,32 +30,42 @@ class Supervisor:
         self.server: ServerProcess | None = None
         self.prepared = False
         self.last_log_player_count = 0
+        self._log_activity_lock = threading.Lock()
+        self._log_source: ServerProcess | None = None
         self.last_stop_monotonic = 0.0
         self.crash_restarts = 0
+        self._start_in_progress = False
+        self._waiting_for_wake = False
+
+    def _request_wake(self) -> dict[str, object]:
+        current = self.state.snapshot().get("state")
+        if self._start_in_progress or current in {"STARTING", "RUNNING", "IDLE"}:
+            return {
+                "ok": True,
+                "message": "server already active",
+                "state": current,
+            }
+        self.wake_event.set()
+        return {"ok": True, "message": "wake requested"}
+
+    def _request_sleep(self) -> dict[str, object]:
+        current = self.state.snapshot().get("state")
+        if self._waiting_for_wake or current in {"SLEEPING", "STOPPING"}:
+            return {
+                "ok": True,
+                "message": "server already sleeping",
+                "state": current,
+            }
+        self.sleep_event.set()
+        return {"ok": True, "message": "sleep requested"}
 
     def dispatch_control(self, command: str) -> dict[str, object]:
         if command == "status":
             return {"ok": True, **self.state.snapshot()}
         if command == "wake":
-            current = self.state.snapshot().get("state")
-            if current in {"STARTING", "RUNNING", "IDLE"}:
-                return {
-                    "ok": True,
-                    "message": "server already active",
-                    "state": current,
-                }
-            self.wake_event.set()
-            return {"ok": True, "message": "wake requested"}
+            return self._request_wake()
         if command == "sleep":
-            current = self.state.snapshot().get("state")
-            if current == "SLEEPING":
-                return {
-                    "ok": True,
-                    "message": "server already sleeping",
-                    "state": current,
-                }
-            self.sleep_event.set()
-            return {"ok": True, "message": "sleep requested"}
+            return self._request_sleep()
         return {"ok": False, "error": f"unknown command: {command}"}
 
     def install_signal_handlers(self) -> None:
@@ -66,12 +76,12 @@ class Supervisor:
             self.sleep_event.set()
 
         def wake(_signum: int, _frame: object) -> None:
-            print("[supervisor] SIGUSR1 wake requested", flush=True)
-            self.wake_event.set()
+            response = self._request_wake()
+            print(f"[supervisor] SIGUSR1 {response['message']}", flush=True)
 
         def sleep(_signum: int, _frame: object) -> None:
-            print("[supervisor] SIGUSR2 sleep requested", flush=True)
-            self.sleep_event.set()
+            response = self._request_sleep()
+            print(f"[supervisor] SIGUSR2 {response['message']}", flush=True)
 
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
@@ -129,7 +139,9 @@ class Supervisor:
             wine_version=version, executable=str(self.settings.executable)
         )
 
-    def prepare_initial(self, update: bool) -> bool:
+    def prepare_initial(
+        self, update: bool, context: str = "Initial preparation"
+    ) -> bool:
         attempt = 0
         while not self.shutdown_event.is_set():
             try:
@@ -144,7 +156,7 @@ class Supervisor:
                 attempt += 1
                 delay = self.settings.update_retry_delay_seconds
                 print(
-                    f"[supervisor] Initial preparation failed: {exc}; "
+                    f"[supervisor] {context} failed: {exc}; "
                     f"retrying in {delay}s (attempt {attempt})",
                     file=sys.stderr,
                     flush=True,
@@ -160,9 +172,27 @@ class Supervisor:
                     return False
         return False
 
-    def _log_activity(self, count: int) -> None:
-        self.last_log_player_count = count
-        self.state.update(log_players=count)
+    def _activate_log_source(self, server: ServerProcess) -> None:
+        with self._log_activity_lock:
+            self._log_source = server
+            self.last_log_player_count = 0
+
+    def _deactivate_log_source(self, server: ServerProcess) -> None:
+        with self._log_activity_lock:
+            if self._log_source is server:
+                self._log_source = None
+                self.last_log_player_count = 0
+
+    def _log_activity(self, source: ServerProcess, count: int) -> None:
+        with self._log_activity_lock:
+            if source is not self._log_source:
+                return
+            self.last_log_player_count = count
+            self.state.update(log_players=count)
+
+    def _log_player_count(self) -> int:
+        with self._log_activity_lock:
+            return self.last_log_player_count
 
     def _cancel_start_if_sleep_requested(self) -> bool:
         if not self.sleep_event.is_set():
@@ -179,15 +209,27 @@ class Supervisor:
         return True
 
     def start_server(self, wake_source: str | None = None) -> bool:
+        self._start_in_progress = True
+        try:
+            return self._start_server(wake_source)
+        finally:
+            self._start_in_progress = False
+
+    def _start_server(self, wake_source: str | None = None) -> bool:
         self.wake_event.clear()
         if not self.prepared:
-            self.prepare(update=not self.settings.executable.exists())
+            if not self.prepare_initial(
+                update=not self.settings.executable.exists(),
+                context="Wake preparation",
+            ):
+                return False
         if self._cancel_start_if_sleep_requested():
             return False
         if self.settings.update_on_wake:
             try:
                 self.perform_update(required=False)
             except UpdateError as exc:
+                self._start_in_progress = False
                 delay = self.settings.update_retry_delay_seconds
                 print(
                     f"[update] Wake cancelled after update failure: {exc}; "
@@ -207,7 +249,7 @@ class Supervisor:
             apply_configuration(self.settings)
         if self._cancel_start_if_sleep_requested():
             return False
-        self.last_log_player_count = 0
+        self.wake_event.clear()
         self.state.set_state(
             "STARTING",
             players=None,
@@ -216,22 +258,54 @@ class Supervisor:
             wake_source=wake_source,
             last_error=None,
         )
-        self.server = ServerProcess(self.settings, self._log_activity)
-        pid = self.server.start()
+        server = ServerProcess(self.settings, self._log_activity)
+        self._activate_log_source(server)
+        try:
+            pid = server.start()
+        except BaseException:
+            self._deactivate_log_source(server)
+            try:
+                server.stop()
+            except Exception as cleanup_exc:
+                print(
+                    f"[supervisor] Failed-start cleanup failed: {cleanup_exc}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                server.close()
+            raise
+        self.server = server
         self.state.update(pid=pid)
         print(f"[supervisor] Server started with PID {pid}", flush=True)
         return True
 
-    def stop_server(self, reason: str) -> None:
-        if not self.server:
+    def stop_server(self, reason: str, *, preserve_state: bool = False) -> None:
+        server = self.server
+        if not server:
             return
-        self.state.set_state("STOPPING", stop_reason=reason)
+        if not preserve_state:
+            self.state.set_state("STOPPING", stop_reason=reason)
         print(f"[supervisor] Stopping server: {reason}", flush=True)
-        return_code = self.server.stop()
-        print(f"[supervisor] Server stopped with exit code {return_code}", flush=True)
-        self.server = None
-        self.last_stop_monotonic = time.monotonic()
-        self.state.update(pid=None, players=0, ready=False, last_exit_code=return_code)
+        self._deactivate_log_source(server)
+        return_code: int | None = None
+        try:
+            return_code = server.stop()
+            print(
+                f"[supervisor] Server stopped with exit code {return_code}", flush=True
+            )
+        finally:
+            server.close()
+            if self.server is server:
+                self.server = None
+            self.last_stop_monotonic = time.monotonic()
+            self.state.update(
+                pid=None,
+                players=0,
+                log_players=0,
+                ready=False,
+                last_exit_code=return_code,
+                stop_reason=reason,
+            )
 
     def monitor_server(self) -> str:
         if self.server is None:
@@ -246,12 +320,19 @@ class Supervisor:
         while not self.shutdown_event.is_set():
             self.state.touch()
             if self.sleep_event.is_set():
+                self.sleep_event.clear()
                 self.stop_server("manual sleep request")
                 return "sleep"
-            return_code = self.server.poll()
+            server = self.server
+            return_code = server.poll()
             if return_code is not None:
-                self.state.update(pid=None, ready=False, last_exit_code=return_code)
-                self.server = None
+                self._deactivate_log_source(server)
+                server.close()
+                if self.server is server:
+                    self.server = None
+                self.state.update(
+                    pid=None, ready=False, log_players=0, last_exit_code=return_code
+                )
                 return "crash"
 
             now = time.monotonic()
@@ -306,9 +387,10 @@ class Supervisor:
                     self.state.update(a2s_ok=False, a2s_error=str(exc))
                     successful_zero_queries = 0
                     if self.settings.allow_log_only_idle and not a2s_ever_succeeded:
-                        if self.last_log_player_count == 0 and idle_since is None:
+                        log_player_count = self._log_player_count()
+                        if log_player_count == 0 and idle_since is None:
                             idle_since = now
-                        elif self.last_log_player_count > 0:
+                        elif log_player_count > 0:
                             idle_since = None
                     else:
                         idle_since = None
@@ -335,6 +417,14 @@ class Supervisor:
         return "shutdown"
 
     def wait_for_wake(self) -> str:
+        self._waiting_for_wake = True
+        try:
+            return self._wait_for_wake()
+        finally:
+            self._waiting_for_wake = False
+
+    def _wait_for_wake(self) -> str:
+        self.sleep_event.clear()
         if self.settings.wake_arm_delay_seconds > 0 and self.last_stop_monotonic:
             deadline = self.last_stop_monotonic + self.settings.wake_arm_delay_seconds
             while not self.shutdown_event.is_set():
@@ -352,7 +442,6 @@ class Supervisor:
                     return "manual"
         if self.shutdown_event.is_set():
             return "shutdown"
-        self.sleep_event.clear()
         if self.wake_event.is_set():
             self.wake_event.clear()
             print("[wake] Manual wake requested", flush=True)
@@ -392,6 +481,7 @@ class Supervisor:
         )
 
         try:
+            listener.open()
             while not self.shutdown_event.is_set():
                 self.state.touch()
                 if update_due(self.settings):
@@ -497,7 +587,21 @@ class Supervisor:
             return 1
         finally:
             if self.server:
-                self.stop_server("supervisor exit")
+                preserve_state = self.state.snapshot().get("state") == "ERROR"
+                try:
+                    self.stop_server("supervisor exit", preserve_state=preserve_state)
+                except Exception as exc:
+                    print(
+                        f"[supervisor] Cleanup failed: {exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    if preserve_state:
+                        self.state.update(cleanup_error=str(exc), pid=None)
+                    else:
+                        self.state.set_state(
+                            "ERROR", last_error=f"cleanup failed: {exc}", pid=None
+                        )
             self.control.stop()
 
 
@@ -507,7 +611,16 @@ def main() -> int:
     except SettingsError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
-    return Supervisor(settings).run()
+    try:
+        supervisor = Supervisor(settings)
+    except OSError as exc:
+        print(
+            f"Configuration error: cannot initialise state file "
+            f"{settings.state_file}: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+    return supervisor.run()
 
 
 if __name__ == "__main__":

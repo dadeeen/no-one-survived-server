@@ -25,6 +25,9 @@ def _timeout_seconds() -> float:
 
 
 def main() -> int:
+    if len(sys.argv) > 2:
+        print("usage: nosctl [status|wake|sleep]", file=sys.stderr)
+        return 2
     command = sys.argv[1].lower() if len(sys.argv) > 1 else "status"
     if command not in {"status", "wake", "sleep"}:
         print("usage: nosctl [status|wake|sleep]", file=sys.stderr)

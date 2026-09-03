@@ -4,6 +4,8 @@ import os
 import signal
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -139,6 +141,57 @@ class ServerProcessTests(unittest.TestCase):
                 result = server.stop()
         self.assertEqual(result, -9)
         killpg.assert_any_call(123, signal.SIGKILL)
+        process.stdout.close.assert_called()
+
+    def test_stop_uses_sigkill_sentinel_when_exit_cannot_be_reaped(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"DATA_DIR": directory}, clear=True),
+        ):
+            settings = Settings.from_env()
+            process = MagicMock()
+            process.pid = 123
+            process.poll.return_value = None
+            process.returncode = None
+            process.wait.side_effect = [
+                subprocess.TimeoutExpired("server", 1),
+                subprocess.TimeoutExpired("server", 1),
+                subprocess.TimeoutExpired("server", 1),
+            ]
+            server = ServerProcess(settings)
+            server.process = process
+            with (
+                patch("nos_server.server_process.os.killpg"),
+                patch("nos_server.server_process.subprocess.run"),
+            ):
+                result = server.stop()
+        self.assertEqual(result, -signal.SIGKILL)
+
+    def test_close_stops_reader_even_when_pipe_writer_stays_open(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"DATA_DIR": directory}, clear=True),
+        ):
+            read_fd, write_fd = os.pipe()
+            stream = os.fdopen(read_fd, "r", encoding="utf-8")
+            server = ServerProcess(Settings.from_env())
+            process = MagicMock()
+            process.stdout = stream
+            server.process = process
+            server._reader_stop.clear()
+            server._reader = threading.Thread(target=server._read_output, daemon=True)
+            server._reader.start()
+            time.sleep(0.05)
+            started = time.monotonic()
+            try:
+                server.close()
+                elapsed = time.monotonic() - started
+            finally:
+                os.close(write_fd)
+
+        self.assertLess(elapsed, 0.8)
+        self.assertIsNone(server._reader)
+        self.assertTrue(stream.closed)
 
 
 if __name__ == "__main__":

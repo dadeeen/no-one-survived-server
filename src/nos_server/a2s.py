@@ -24,6 +24,7 @@ class ServerInfo:
     players: int
     max_players: int
     bots: int
+    game_id: int | None = None
 
 
 def _cstring(data: bytes, offset: int) -> tuple[str, int]:
@@ -53,8 +54,52 @@ def parse_info_response(packet: bytes) -> ServerInfo:
     app_id = struct.unpack_from("<H", payload, offset)[0]
     offset += 2
     players, max_players, bots = payload[offset : offset + 3]
+    offset += 3
+
+    game_id: int | None = None
+    # The legacy AppID field is only 16-bit. Newer Source-query responses can
+    # include the accurate 64-bit GameID in EDF 0x01; its low 24 bits are the
+    # actual AppID. Keep accepting minimal/older responses that stop after the
+    # player counters.
+    if len(payload) >= offset + 4:
+        offset += 4  # server type, environment, visibility, VAC
+        _version, offset = _cstring(payload, offset)
+        if offset < len(payload):
+            edf = payload[offset]
+            offset += 1
+
+            def require(size: int, field: str) -> None:
+                if len(payload) < offset + size:
+                    raise A2SError(f"Truncated A2S_INFO response ({field})")
+
+            if edf & 0x80:
+                require(2, "port")
+                offset += 2
+            if edf & 0x10:
+                require(8, "steam id")
+                offset += 8
+            if edf & 0x40:
+                require(2, "SourceTV port")
+                offset += 2
+                _source_tv_name, offset = _cstring(payload, offset)
+            if edf & 0x20:
+                _keywords, offset = _cstring(payload, offset)
+            if edf & 0x01:
+                require(8, "game id")
+                game_id = struct.unpack_from("<Q", payload, offset)[0]
+                app_id = game_id & 0xFFFFFF
+
     return ServerInfo(
-        protocol, name, map_name, folder, game, app_id, players, max_players, bots
+        protocol,
+        name,
+        map_name,
+        folder,
+        game,
+        app_id,
+        players,
+        max_players,
+        bots,
+        game_id,
     )
 
 

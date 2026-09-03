@@ -133,6 +133,8 @@ Future or uncommon settings can be supplied through `GAME_INI_OVERRIDES` as JSON
 GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"AnotherValue":2}}
 ```
 
+`GAME_INI_OVERRIDES` is intentionally limited to keys that are not managed by the dedicated environment variables above. A case-insensitive collision with a managed key is rejected instead of silently shadowing values such as `Password` or `AdminPassword`.
+
 For complex or sensitive JSON use `GAME_INI_OVERRIDES_FILE`. The referenced file must be mounted into the container and readable by the configured `PUID`; the supplied examples do not automatically mount arbitrary override files.
 
 ### Passwords
@@ -163,15 +165,15 @@ Empty direct password variables are treated as unset so optional Compose interpo
 | `UMASK` | `0027` | Runtime file creation mask; `Game.ini` is additionally forced to `0600`. |
 | `FIX_PERMISSIONS` | `true` | Apply recursive ownership once per UID/GID pair using a marker in `/data`. Accepts the same boolean spellings as the Python settings. |
 
-The supplied Compose and Portainer stacks deliberately mount the named volume at `/data` and do not expose alternate persistent-root layouts. `DATA_DIR`, `SERVER_DIR`, `SAVED_DIR`, `STATE_DIR`, `STEAMCMD_DIR` and `WINEPREFIX` remain available for custom `docker run` or derived-image integrations. Every persistent path must be absolute and remain below `DATA_DIR`.
+The supplied Compose and Portainer stacks deliberately mount the named volume at `/data` and do not expose alternate persistent-root layouts. `DATA_DIR`, `SERVER_DIR`, `SAVED_DIR`, `STATE_DIR`, `STEAMCMD_DIR` and `WINEPREFIX` remain available for custom `docker run` or derived-image integrations. Every persistent path must be absolute and a strict child of `DATA_DIR`. `SAVED_DIR` must not overlap `SERVER_DIR`; `WINEPREFIX` must not overlap the server, save, SteamCMD or state directories and must not contain `HOME`.
 
 ## Control and health
 
 | Variable | Default | Meaning |
 |---|---:|---|
 | `RUNTIME_DIR` | `/run/nos` | Ephemeral runtime directory. Must be absolute. |
-| `STATE_FILE` | `<RUNTIME_DIR>/state.json` | Optional absolute supervisor state-file override. Empty keeps the derived default. |
-| `CONTROL_SOCKET` | `<RUNTIME_DIR>/control.sock` | Optional absolute control-socket override. Empty keeps the derived default. An existing non-socket path is never removed. |
+| `STATE_FILE` | `<RUNTIME_DIR>/state.json` | Optional absolute supervisor state-file override. Empty keeps the derived default. Runtime endpoints must not be placed below the server, saved-game, Wine-prefix or SteamCMD trees. |
+| `CONTROL_SOCKET` | `<RUNTIME_DIR>/control.sock` | Optional absolute control-socket override. Empty keeps the derived default. An existing non-socket path is never removed; runtime endpoints must not be placed below the server, saved-game, Wine-prefix or SteamCMD trees. |
 | `NOSCTL_TIMEOUT_SECONDS` | `5` | Maximum connect/read time for one `nosctl` request. Must be a positive finite number. |
 | `HEALTHCHECK_MAX_HEARTBEAT_AGE` | `600` | Maximum heartbeat age in seconds before the container becomes unhealthy. |
 

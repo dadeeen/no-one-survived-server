@@ -92,4 +92,4 @@ docker volume ls --filter name=no-one-survived
 
 The volume remains when the container is recreated or updated. It is deleted only when explicitly removed, for example with `docker volume rm`, `docker compose down -v`, or the corresponding Portainer action. Back up `/data/saved` outside the Docker host.
 
-The example uses `latest` for convenience. For stable operation, replace it in the `image:` line with a tested release tag such as `v0.1.0`.
+The example uses `latest` for convenience. For stable operation, replace it in the `image:` line with a tested release tag such as `0.1.0`.

@@ -23,13 +23,61 @@ grep -q 'FIX_PERMISSIONS must be a boolean' "$tmp/boolean.out"
 
 mkdir -p "$tmp/data/saved"
 printf 'original\n' >"$tmp/data/saved/world.sav"
-DATA_DIR="$tmp/data" BACKUP_DIR="$tmp/data/backups" KEEP_BACKUPS=2 \
-  ./scripts/backup.sh >"$tmp/backup.out"
+(umask 0000; DATA_DIR="$tmp/data" BACKUP_DIR="$tmp/data/backups" KEEP_BACKUPS=2 \
+  ./scripts/backup.sh >"$tmp/backup.out")
 archive="$(find "$tmp/data/backups" -name 'saved-*.tar.gz' -print -quit)"
+[[ "$(stat -c '%a' "$archive")" == 600 ]]
+[[ "$(stat -c '%a' "$tmp/data/backups")" == 700 ]]
 printf 'changed\n' >"$tmp/data/saved/world.sav"
-DATA_DIR="$tmp/data" ./scripts/restore.sh "$archive" >"$tmp/restore.out"
+(umask 0000; DATA_DIR="$tmp/data" ./scripts/restore.sh "$archive" >"$tmp/restore.out")
 grep -q '^original$' "$tmp/data/saved/world.sav"
+[[ "$(stat -c '%a' "$tmp/data/saved")" == 700 ]]
 find "$tmp/data" -maxdepth 1 -type d -name 'saved.before-restore.*' | grep -q .
+
+mkdir -p "$tmp/outside-saved"
+printf 'outside\n' >"$tmp/outside-saved/world.sav"
+if DATA_DIR="$tmp/data" SAVED_DIR="$tmp/outside-saved" \
+  BACKUP_DIR="$tmp/data/backups" ./scripts/backup.sh >"$tmp/outside-backup.out" 2>&1; then
+  echo "backup accepted SAVED_DIR outside DATA_DIR" >&2
+  exit 1
+fi
+grep -q 'SAVED_DIR must be located below DATA_DIR' "$tmp/outside-backup.out"
+if DATA_DIR="$tmp/data" SAVED_DIR="$tmp/outside-saved" \
+  ./scripts/restore.sh "$archive" >"$tmp/outside-restore.out" 2>&1; then
+  echo "restore accepted SAVED_DIR outside DATA_DIR" >&2
+  exit 1
+fi
+grep -q 'SAVED_DIR must be located below DATA_DIR' "$tmp/outside-restore.out"
+grep -q '^outside$' "$tmp/outside-saved/world.sav"
+
+mkdir -p "$tmp/custom-data/custom saves"
+printf 'custom-original\n' >"$tmp/custom-data/custom saves/world.sav"
+DATA_DIR="$tmp/custom-data" \
+  SAVED_DIR="$tmp/custom-data/custom saves" \
+  BACKUP_DIR="$tmp/custom-data/backups" \
+  KEEP_BACKUPS=1 \
+  ./scripts/backup.sh >"$tmp/custom-backup.out"
+custom_archive="$(find "$tmp/custom-data/backups" -name 'saved-*.tar.gz' -print -quit)"
+tar -tzf "$custom_archive" | grep -q '^saved/world\.sav$'
+printf 'custom-changed\n' >"$tmp/custom-data/custom saves/world.sav"
+DATA_DIR="$tmp/custom-data" SAVED_DIR="$tmp/custom-data/custom saves" \
+  ./scripts/restore.sh "$custom_archive" >"$tmp/custom-restore.out"
+grep -q '^custom-original$' "$tmp/custom-data/custom saves/world.sav"
+find "$tmp/custom-data" -maxdepth 1 -type d -name 'custom saves.before-restore.*' | grep -q .
+
+mkdir -p "$tmp/zero-data/saved"
+printf 'keep-all\n' >"$tmp/zero-data/saved/world.sav"
+DATA_DIR="$tmp/zero-data" BACKUP_DIR="$tmp/zero-data/backups" KEEP_BACKUPS=0 \
+  ./scripts/backup.sh >"$tmp/backup-zero.out"
+[[ "$(find "$tmp/zero-data/backups" -type f -name 'saved-*.tar.gz' | wc -l)" -eq 1 ]]
+
+space_backup_dir="$tmp/my  backups"
+DATA_DIR="$tmp/zero-data" BACKUP_DIR="$space_backup_dir" KEEP_BACKUPS=1 \
+  ./scripts/backup.sh >"$tmp/backup-space-1.out"
+sleep 1
+DATA_DIR="$tmp/zero-data" BACKUP_DIR="$space_backup_dir" KEEP_BACKUPS=1 \
+  ./scripts/backup.sh >"$tmp/backup-space-2.out"
+[[ "$(find "$space_backup_dir" -type f -name 'saved-*.tar.gz' | wc -l)" -eq 1 ]]
 
 python3 - "$tmp/bad.tar.gz" <<'PY'
 import io

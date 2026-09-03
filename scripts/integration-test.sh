@@ -49,19 +49,24 @@ docker run -d \
   nos-integration:local
 
 wait_for_state() {
-  local wanted="$1" timeout="$2" elapsed=0 state=""
+  local wanted="$1" timeout="$2" elapsed=0 state="" status_json="" retry_in=""
   while (( elapsed < timeout )); do
     if [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null || true)" != true ]]; then
       echo "Integration container stopped while waiting for state(s): $wanted" >&2
       return 1
     fi
-    state="$(docker exec "$name" nosctl status 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("state", ""))' 2>/dev/null || true)"
+    status_json="$(docker exec "$name" nosctl status 2>/dev/null || true)"
+    state="$(printf '%s' "$status_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("state", ""))' 2>/dev/null || true)"
     case ",$wanted," in
       *",$state,"*) return 0 ;;
     esac
     if [[ "$state" == ERROR ]]; then
-      echo "Integration container entered ERROR while waiting for state(s): $wanted" >&2
-      return 1
+      retry_in="$(printf '%s' "$status_json" | python3 -c 'import json,sys; value=json.load(sys.stdin).get("retry_in_seconds"); print("" if value is None else value)' 2>/dev/null || true)"
+      if [[ -z "$retry_in" ]]; then
+        echo "Integration container entered terminal ERROR while waiting for state(s): $wanted" >&2
+        return 1
+      fi
+      echo "Integration container reported retryable ERROR (retry in ${retry_in}s); continuing to wait." >&2
     fi
     sleep 10
     elapsed=$((elapsed + 10))

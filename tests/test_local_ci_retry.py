@@ -26,6 +26,12 @@ class LocalCiRetryTests(unittest.TestCase):
             integration_run.index('"nos-integration:local"'),
         )
 
+    def test_linux_integration_waits_through_retryable_error(self) -> None:
+        integration = (ROOT / "scripts/integration-test.sh").read_text(encoding="utf-8")
+        self.assertIn('get("retry_in_seconds")', integration)
+        self.assertIn('if [[ -z "$retry_in" ]]', integration)
+        self.assertIn("entered terminal ERROR", integration)
+
 
 if __name__ == "__main__":
     unittest.main()

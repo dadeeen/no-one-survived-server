@@ -121,6 +121,15 @@ class WakeListenerTests(unittest.TestCase):
         self.assertIsNotNone(second[0])
         self.assertEqual(listener._sockets, [])
 
+    def test_open_binds_socket_before_wait(self) -> None:
+        port = free_udp_port()
+        listener = WakeListener("127.0.0.1", [port], source_policy="any")
+        self.addCleanup(listener.close)
+        listener.open()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as competing:
+            with self.assertRaises(OSError):
+                competing.bind(("127.0.0.1", port))
+
     def test_packet_history_prunes_expired_sources(self) -> None:
         listener = WakeListener(
             "127.0.0.1", [], packet_count=2, packet_window_seconds=5

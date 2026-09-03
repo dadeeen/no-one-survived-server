@@ -113,6 +113,18 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.state_file, Path("/tmp/custom-state.json"))
         self.assertEqual(settings.control_socket, Path("/tmp/custom-control.sock"))
 
+    def test_runtime_endpoint_must_not_overwrite_saved_content(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DATA_DIR": "/data",
+                "STATE_FILE": "/data/saved/Config/WindowsServer/Game.ini",
+            },
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SettingsError, "below SAVED_DIR"):
+                Settings.from_env()
+
     def test_rejects_relative_paths_before_resolution(self) -> None:
         for name, value in (
             ("DATA_DIR", "data"),
@@ -145,6 +157,40 @@ class SettingsTests(unittest.TestCase):
             clear=True,
         ):
             with self.assertRaises(SettingsError):
+                Settings.from_env()
+
+    def test_rejects_persistent_path_equal_to_data_dir(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"DATA_DIR": "/data", "WINEPREFIX": "/data"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SettingsError, "below DATA_DIR"):
+                Settings.from_env()
+
+    def test_rejects_saved_dir_inside_server_dir(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DATA_DIR": "/data",
+                "SAVED_DIR": "/data/server/WRSH/Saved",
+            },
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SettingsError, "SAVED_DIR must not overlap"):
+                Settings.from_env()
+
+    def test_rejects_wineprefix_containing_saved_dir(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DATA_DIR": "/data",
+                "WINEPREFIX": "/data/prefix",
+                "SAVED_DIR": "/data/prefix/saved",
+            },
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SettingsError, "WINEPREFIX must not overlap"):
                 Settings.from_env()
 
 

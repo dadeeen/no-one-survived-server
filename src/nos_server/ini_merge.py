@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
-import shutil
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -18,24 +19,24 @@ def merge_ini(
 ) -> None:
     """Update selected INI keys while preserving unknown lines and comments."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        if template and template.exists():
-            shutil.copyfile(template, path)
-        else:
-            path.write_text("", encoding="utf-8")
-
-    text = path.read_text(encoding="utf-8-sig")
+    if path.exists():
+        text = path.read_text(encoding="utf-8-sig")
+    elif template and template.exists():
+        text = template.read_text(encoding="utf-8-sig")
+    else:
+        text = ""
     lines = text.splitlines(keepends=True)
     if text and not text.endswith(("\n", "\r")):
         lines[-1] += "\n"
 
-    pending = {
-        _normal(section): {
-            _normal(key): (key, str(value)) for key, value in values.items()
-        }
-        for section, values in updates.items()
-    }
-    section_names = {_normal(section): section for section in updates}
+    pending: dict[str, dict[str, tuple[str, str]]] = {}
+    section_names: dict[str, str] = {}
+    for section, section_values in updates.items():
+        section_norm = _normal(section)
+        section_names.setdefault(section_norm, section)
+        bucket = pending.setdefault(section_norm, {})
+        for key, value in section_values.items():
+            bucket[_normal(key)] = (key, str(value))
     current_section: str | None = None
     seen_sections: set[str] = set()
     seen_keys: set[tuple[str, str]] = set()
@@ -73,14 +74,25 @@ def merge_ini(
 
     append_missing(current_section)
 
-    for section_norm, values in pending.items():
+    for section_norm, pending_values in pending.items():
         if section_norm in seen_sections:
             continue
         if output and output[-1].strip():
             output.append("\n")
         output.append(f"[{section_names[section_norm]}]\n")
-        for key_norm, (display_key, value) in values.items():
+        for key_norm, (display_key, value) in pending_values.items():
             output.append(f"{display_key}={value}\n")
             seen_keys.add((section_norm, key_norm))
 
-    path.write_text("".join(output), encoding="utf-8")
+    fd, temporary_name = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("".join(output))
+            handle.flush()
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise

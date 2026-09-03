@@ -121,6 +121,40 @@ class ConfigurationTests(unittest.TestCase):
                     with self.assertRaisesRegex(SettingsError, "must be finite"):
                         build_updates()
 
+    def test_rejects_case_insensitive_override_of_managed_key(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"GAME_INI_OVERRIDES": '{"serversetting":{"password":"shadow"}}'},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SettingsError, "managed setting"):
+                build_updates()
+
+    def test_case_variant_section_with_unmanaged_key_keeps_managed_secrets(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(
+                os.environ,
+                {
+                    "DATA_DIR": directory,
+                    "RUNTIME_DIR": f"{directory}/runtime",
+                    "REQUIRE_PASSWORD": "true",
+                    "SERVER_PASSWORD": "letmein",
+                    "GAME_INI_OVERRIDES": (
+                        '{"serversetting":{"FutureSetting":"enabled"}}'
+                    ),
+                },
+                clear=True,
+            ):
+                settings = Settings.from_env()
+                apply_configuration(settings)
+                content = settings.game_ini.read_text(encoding="utf-8")
+        self.assertIn("NeedPassword=True", content)
+        self.assertIn("Password=letmein", content)
+        self.assertIn("AdminPassword=", content)
+        self.assertIn("FutureSetting=enabled", content)
+
 
 if __name__ == "__main__":
     unittest.main()

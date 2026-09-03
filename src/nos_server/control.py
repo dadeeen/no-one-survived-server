@@ -4,22 +4,42 @@ import json
 import os
 import socketserver
 import stat
+import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
 
 
 class _Handler(socketserver.StreamRequestHandler):
+    timeout = 5.0
+
     def handle(self) -> None:
-        command = (
-            self.rfile.readline(4096).decode("utf-8", errors="replace").strip().lower()
-        )
-        response = self.server.dispatch(command)  # type: ignore[attr-defined]
-        self.wfile.write((json.dumps(response, sort_keys=True) + "\n").encode("utf-8"))
+        try:
+            request = self.rfile.readline(4096)
+        except OSError as exc:
+            print(f"[control] request read failed: {exc}", file=sys.stderr, flush=True)
+            return
+        if not request:
+            return
+        command = request.decode("utf-8", errors="replace").strip().lower()
+        try:
+            response = self.server.dispatch(command)  # type: ignore[attr-defined]
+        except Exception as exc:
+            print(f"[control] dispatch failed: {exc}", file=sys.stderr, flush=True)
+            response = {"ok": False, "error": f"control command failed: {exc}"}
+        try:
+            self.wfile.write(
+                (json.dumps(response, sort_keys=True) + "\n").encode("utf-8")
+            )
+        except OSError as exc:
+            print(
+                f"[control] response write failed: {exc}", file=sys.stderr, flush=True
+            )
 
 
 class _UnixServer(socketserver.ThreadingUnixStreamServer):
     daemon_threads = True
+    request_queue_size = 16
 
     def __init__(self, path: str, dispatch: Callable[[str], dict[str, object]]) -> None:
         self.dispatch = dispatch
@@ -55,8 +75,18 @@ class ControlServer:
                     f"Refusing to replace non-socket control path: {self.path}"
                 )
             self.path.unlink()
-        self.server = _UnixServer(str(self.path), self.dispatch)
-        os.chmod(self.path, 0o600)
+        previous_umask = os.umask(0o177)
+        try:
+            self.server = _UnixServer(str(self.path), self.dispatch)
+        finally:
+            os.umask(previous_umask)
+        try:
+            os.chmod(self.path, 0o600)
+        except OSError:
+            self.server.server_close()
+            self.server = None
+            self._unlink_socket()
+            raise
         self.thread = threading.Thread(
             target=self.server.serve_forever, name="control-server", daemon=True
         )

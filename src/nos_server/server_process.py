@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import select
 import shlex
 import signal
 import subprocess
@@ -25,7 +26,9 @@ LEAVE_RE = re.compile(
 
 class ServerProcess:
     def __init__(
-        self, settings: Settings, on_log_activity: Callable[[int], None] | None = None
+        self,
+        settings: Settings,
+        on_log_activity: Callable[[ServerProcess, int], None] | None = None,
     ) -> None:
         self.settings = settings
         self.on_log_activity = on_log_activity
@@ -33,6 +36,7 @@ class ServerProcess:
         self.ready = threading.Event()
         self.log_players: set[str] = set()
         self._reader: threading.Thread | None = None
+        self._reader_stop = threading.Event()
 
     def command(self) -> list[str]:
         command = [
@@ -57,6 +61,7 @@ class ServerProcess:
             raise FileNotFoundError(self.settings.executable)
         self.ready.clear()
         self.log_players.clear()
+        self._reader_stop.clear()
         env = wine_environment(self.settings)
         self.process = subprocess.Popen(
             self.command(),
@@ -80,65 +85,121 @@ class ServerProcess:
         process = self.process
         if process is None or process.stdout is None:
             return
-        for line in process.stdout:
-            print(f"[server] {line}", end="", flush=True)
-            if READY_RE.search(line):
-                self.ready.set()
-            match = JOIN_RE.search(line)
-            if match:
-                self.log_players.add(match.group("id"))
-                if self.on_log_activity:
-                    self.on_log_activity(len(self.log_players))
+        try:
+            descriptor = process.stdout.fileno()
+        except (AttributeError, OSError, ValueError):
+            return
+
+        buffered = b""
+        while not self._reader_stop.is_set():
+            try:
+                readable, _, _ = select.select([descriptor], [], [], 0.25)
+            except (OSError, ValueError):
+                break
+            if not readable:
                 continue
-            match = LEAVE_RE.search(line)
-            if match:
-                self.log_players.discard(match.group("id"))
-                if self.on_log_activity:
-                    self.on_log_activity(len(self.log_players))
+            try:
+                chunk = os.read(descriptor, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            buffered += chunk
+            while b"\n" in buffered:
+                raw_line, buffered = buffered.split(b"\n", 1)
+                line = raw_line.decode("utf-8", errors="replace") + "\n"
+                self._handle_output_line(line)
+
+        if buffered and not self._reader_stop.is_set():
+            self._handle_output_line(buffered.decode("utf-8", errors="replace"))
+
+    def _handle_output_line(self, line: str) -> None:
+        print(f"[server] {line}", end="", flush=True)
+        if READY_RE.search(line):
+            self.ready.set()
+        match = JOIN_RE.search(line)
+        if match:
+            self.log_players.add(match.group("id"))
+            if self.on_log_activity:
+                self.on_log_activity(self, len(self.log_players))
+            return
+        match = LEAVE_RE.search(line)
+        if match:
+            self.log_players.discard(match.group("id"))
+            if self.on_log_activity:
+                self.on_log_activity(self, len(self.log_players))
 
     def poll(self) -> int | None:
         return None if self.process is None else self.process.poll()
+
+    def close(self) -> None:
+        self._reader_stop.set()
+        reader = self._reader
+        if reader is not None and reader is not threading.current_thread():
+            reader.join(timeout=1.0)
+            if reader.is_alive():
+                print(
+                    "[server] Output reader did not stop within 1s; "
+                    "leaving stdout open for the reader",
+                    flush=True,
+                )
+                return
+        self._reader = None
+        process = self.process
+        if process is not None and process.stdout is not None:
+            close = getattr(process.stdout, "close", None)
+            if close is not None:
+                try:
+                    close()
+                except OSError:
+                    pass
 
     def stop(self) -> int | None:
         if self.process is None:
             return None
         process = self.process
-        if process.poll() is not None:
-            return process.returncode
         try:
-            os.killpg(process.pid, signal.SIGINT)
-        except ProcessLookupError:
-            pass
-        try:
-            return process.wait(timeout=self.settings.server_stop_timeout_seconds)
-        except subprocess.TimeoutExpired:
-            print("[server] Graceful stop timed out; sending SIGTERM", flush=True)
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        try:
-            return process.wait(timeout=15)
-        except subprocess.TimeoutExpired:
-            print("[server] SIGTERM timed out; terminating Wine server", flush=True)
-        try:
-            subprocess.run(
-                [WINESERVER, "-k"],
-                env=wine_environment(self.settings),
-                check=False,
-                timeout=30,
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            print(f"[server] wineserver shutdown failed: {exc}", flush=True)
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        try:
-            return process.wait(timeout=15)
-        except subprocess.TimeoutExpired:
-            print(
-                "[server] Process did not exit after SIGKILL; leaving cleanup to tini",
-                flush=True,
-            )
-            return process.poll()
+            if process.poll() is not None:
+                return process.returncode
+            try:
+                os.killpg(process.pid, signal.SIGINT)
+            except ProcessLookupError:
+                pass
+            try:
+                return process.wait(timeout=self.settings.server_stop_timeout_seconds)
+            except subprocess.TimeoutExpired:
+                print("[server] Graceful stop timed out; sending SIGTERM", flush=True)
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                return process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                print("[server] SIGTERM timed out; terminating Wine server", flush=True)
+            try:
+                subprocess.run(
+                    [WINESERVER, "-k"],
+                    env=wine_environment(self.settings),
+                    check=False,
+                    timeout=30,
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                print(f"[server] wineserver shutdown failed: {exc}", flush=True)
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            try:
+                return process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                print(
+                    "[server] Process did not exit after SIGKILL; leaving cleanup to tini",
+                    flush=True,
+                )
+                # The child has not produced an observable exit status.  Use the
+                # conventional negative signal value as an explicit forced-kill
+                # sentinel instead of recording null/"never started".
+                return -signal.SIGKILL
+        finally:
+            self.close()

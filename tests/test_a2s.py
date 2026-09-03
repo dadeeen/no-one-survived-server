@@ -18,6 +18,22 @@ def fixture(players: int = 3, maximum: int = 8) -> bytes:
     return bytes(payload)
 
 
+def fixture_with_game_id(app_id: int) -> bytes:
+    payload = bytearray(b"\xff\xff\xff\xffI")
+    payload.append(17)
+    for value in ("Test Server", "Map01", "WRSH", "No One Survived"):
+        payload.extend(value.encode())
+        payload.append(0)
+    payload.extend(struct.pack("<H", app_id & 0xFFFF))
+    payload.extend(bytes([3, 8, 0]))
+    payload.extend(b"dl")
+    payload.extend(bytes([0, 1]))
+    payload.extend(b"1.0\x00")
+    payload.append(0x01)
+    payload.extend(struct.pack("<Q", app_id))
+    return bytes(payload)
+
+
 class A2STests(unittest.TestCase):
     def test_parses_player_count(self) -> None:
         info = parse_info_response(fixture())
@@ -25,6 +41,11 @@ class A2STests(unittest.TestCase):
         self.assertEqual(info.map_name, "Map01")
         self.assertEqual(info.players, 3)
         self.assertEqual(info.max_players, 8)
+
+    def test_prefers_full_app_id_from_extended_game_id(self) -> None:
+        info = parse_info_response(fixture_with_game_id(2329680))
+        self.assertEqual(info.app_id, 2329680)
+        self.assertEqual(info.game_id, 2329680)
 
     def test_rejects_invalid_header(self) -> None:
         with self.assertRaises(A2SError):

@@ -301,20 +301,61 @@ class Settings:
             if not path.is_absolute():
                 raise SettingsError(f"{name} must be an absolute path")
             resolved = path.resolve(strict=False)
-            if not resolved.is_relative_to(data_root):
+            if resolved == data_root or not resolved.is_relative_to(data_root):
                 raise SettingsError(
                     f"{name} must be located below DATA_DIR ({data_root})"
                 )
+        resolved_server = settings.server_dir.resolve(strict=False)
+        resolved_saved = settings.saved_dir.resolve(strict=False)
+        resolved_wine = settings.wine_prefix.resolve(strict=False)
+        resolved_steamcmd = settings.steamcmd_dir.resolve(strict=False)
+        resolved_state = settings.state_dir.resolve(strict=False)
+        resolved_home = settings.home_dir.resolve(strict=False)
+
+        def overlaps(left: Path, right: Path) -> bool:
+            return (
+                left == right
+                or left.is_relative_to(right)
+                or right.is_relative_to(left)
+            )
+
+        if overlaps(resolved_saved, resolved_server):
+            raise SettingsError("SAVED_DIR must not overlap SERVER_DIR")
+        for name, protected in (
+            ("SERVER_DIR", resolved_server),
+            ("SAVED_DIR", resolved_saved),
+            ("STEAMCMD_DIR", resolved_steamcmd),
+            ("STATE_DIR", resolved_state),
+        ):
+            if overlaps(resolved_wine, protected):
+                raise SettingsError(f"WINEPREFIX must not overlap {name}")
+        if resolved_home == resolved_wine or resolved_home.is_relative_to(
+            resolved_wine
+        ):
+            raise SettingsError("WINEPREFIX must not contain HOME")
         runtime_root = settings.runtime_dir.resolve(strict=False)
-        if runtime_root == Path("/"):
+        if not settings.runtime_dir.is_absolute() or runtime_root == Path("/"):
             raise SettingsError("RUNTIME_DIR must be an absolute path other than /")
         runtime_paths = {
             "STATE_FILE": settings.state_file,
             "CONTROL_SOCKET": settings.control_socket,
         }
+        protected_runtime_roots = {
+            "SERVER_DIR": settings.server_dir.resolve(strict=False),
+            "SAVED_DIR": settings.saved_dir.resolve(strict=False),
+            "WINEPREFIX": settings.wine_prefix.resolve(strict=False),
+            "STEAMCMD_DIR": settings.steamcmd_dir.resolve(strict=False),
+        }
         for name, path in runtime_paths.items():
             if not path.is_absolute() or path == Path("/"):
                 raise SettingsError(f"{name} must be an absolute path other than /")
+            resolved = path.resolve(strict=False)
+            for protected_name, protected_root in protected_runtime_roots.items():
+                if resolved.is_relative_to(protected_root):
+                    raise SettingsError(
+                        f"{name} must not be located below {protected_name} "
+                        f"({protected_root})"
+                    )
         return settings
 
     @property

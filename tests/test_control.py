@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from nos_server import nosctl
+from nos_server import control as control_module
 from nos_server.control import ControlServer
 
 
@@ -35,6 +36,59 @@ class ControlServerTests(unittest.TestCase):
                     response = json.loads(client.recv(4096))
                 self.assertEqual(response, {"ok": True, "command": "status"})
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            finally:
+                server.stop()
+
+    def test_socket_is_private_immediately_after_bind(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "control.sock"
+            observed_modes: list[int] = []
+            original = control_module._UnixServer
+
+            def create(path_text: str, dispatch: object) -> object:
+                backend = original(path_text, dispatch)  # type: ignore[arg-type]
+                observed_modes.append(Path(path_text).stat().st_mode & 0o777)
+                return backend
+
+            server = ControlServer(path, lambda _command: {"ok": True})
+            with patch.object(control_module, "_UnixServer", side_effect=create):
+                server.start()
+            try:
+                self.assertEqual(observed_modes, [0o600])
+            finally:
+                server.stop()
+
+    def test_dispatch_failure_returns_error_response(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "control.sock"
+
+            def fail(_command: str) -> dict[str, object]:
+                raise RuntimeError("boom")
+
+            server = ControlServer(path, fail)
+            server.start()
+            try:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                    client.connect(str(path))
+                    client.sendall(b"status\n")
+                    response = json.loads(client.recv(4096))
+                self.assertFalse(response["ok"])
+                self.assertIn("boom", response["error"])
+            finally:
+                server.stop()
+
+    def test_stalled_control_client_is_timed_out(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "control.sock"
+            server = ControlServer(path, lambda _command: {"ok": True})
+            server.start()
+            try:
+                with patch.object(control_module._Handler, "timeout", 0.05):
+                    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                        client.settimeout(1)
+                        client.connect(str(path))
+                        client.sendall(b"status")
+                        self.assertEqual(client.recv(4096), b"")
             finally:
                 server.stop()
 
@@ -115,6 +169,18 @@ class ControlServerTests(unittest.TestCase):
                     result = nosctl.main()
                 self.assertEqual(result, 2)
                 self.assertIn("control socket configuration error", error.getvalue())
+
+    def test_nosctl_rejects_extra_arguments(self) -> None:
+        error = io.StringIO()
+        with (
+            patch.object(nosctl.sys, "argv", ["nosctl", "sleep", "--now"]),
+            patch("nos_server.nosctl.socket.socket") as socket_factory,
+            redirect_stderr(error),
+        ):
+            result = nosctl.main()
+        self.assertEqual(result, 2)
+        self.assertIn("usage: nosctl", error.getvalue())
+        socket_factory.assert_not_called()
 
     def test_nosctl_rejects_platform_timeout_overflow(self) -> None:
         client = MagicMock()

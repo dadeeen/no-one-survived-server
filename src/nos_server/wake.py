@@ -87,6 +87,10 @@ class WakeListener:
         self._selector = selector
         return selector
 
+    def open(self) -> None:
+        if self.ports:
+            self._ensure_open()
+
     def close(self) -> None:
         if self._selector is not None:
             self._selector.close()

@@ -4,7 +4,7 @@
 
 services:
   no-one-survived:
-    # Replace latest with a tested release tag such as v0.1.0 for stable operation.
+    # Replace latest with a tested release tag such as 0.1.0 for stable operation.
     image: ghcr.io/dadeeen/no-one-survived-server:latest
     container_name: no-one-survived
     restart: unless-stopped

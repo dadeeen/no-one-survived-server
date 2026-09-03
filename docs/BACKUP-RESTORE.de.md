@@ -2,7 +2,7 @@
 
 [English](BACKUP-RESTORE.md) · [Zurück zur README](../README.de.md)
 
-Nicht ersetzbar ist hauptsächlich `/data/saved`. Serverdateien, SteamCMD und Wine-Prefix können neu erzeugt werden.
+Nicht ersetzbar ist hauptsächlich `SAVED_DIR` (standardmäßig `/data/saved`). Serverdateien, SteamCMD und Wine-Prefix können neu erzeugt werden.
 
 ## Konsistente Sicherung
 
@@ -19,7 +19,7 @@ Auf `SLEEPING` warten und dann ausführen:
 docker exec no-one-survived nos-backup
 ```
 
-Das Backup-Hilfsprogramm legt Root-Rechte automatisch ab und schreibt Archive mit der konfigurierten Laufzeit-Eigentümerschaft. Standardziel ist `/data/backups`; fünf Archive werden aufbewahrt. `KEEP_BACKUPS` oder `BACKUP_DIR` können bei Bedarf über `docker exec --env` überschrieben werden.
+Das Backup-Hilfsprogramm legt Root-Rechte automatisch ab und sichert das konfigurierte `SAVED_DIR`. Backup-Archive und neu angelegte Backup-Verzeichnisse sind bereits bei der Erstellung privat (`0600` bzw. `0700`), auch bei Aufruf über `docker exec`. Standardziel ist `/data/backups`; fünf Archive werden aufbewahrt. `KEEP_BACKUPS` oder `BACKUP_DIR` können bei Bedarf über `docker exec --env` überschrieben werden. `KEEP_BACKUPS=0` deaktiviert die Aufbewahrungsbereinigung und behält alle Archive.
 
 Eine Sicherung im selben Docker-Volume schützt vor fehlerhaften Updates, nicht vor Verlust des Hosts oder Volumes. Archive zusätzlich auf NAS oder ein anderes Backupsystem kopieren.
 
@@ -34,4 +34,4 @@ Eine Sicherung im selben Docker-Volume schützt vor fehlerhaften Updates, nicht 
    docker exec no-one-survived nos-restore /data/backups/saved-YYYY-MM-DD_HH-MM-SS.tar.gz
    ```
 
-Das Restore-Hilfsprogramm prüft zunächst das vollständige Archiv, lehnt Pfade außerhalb von `saved/`, Links und Spezialdateien ab und entpackt in ein temporäres Verzeichnis. Anschließend wird der bestehende Ordner `/data/saved` in `saved.before-restore.<timestamp>.<pid>` umbenannt, der wiederhergestellte Ordner innerhalb desselben Volumes an seine Stelle verschoben und bei einem normalen Root-`docker exec` die konfigurierte Eigentümerschaft aus `PUID`/`PGID` angewendet.
+Das Restore-Hilfsprogramm verwendet einen privaten Staging-Baum (`umask 0077`), prüft zunächst das vollständige Archiv, lehnt Pfade außerhalb von `saved/`, Links und Spezialdateien ab und entpackt in ein temporäres Verzeichnis. Anschließend wird das bestehende `SAVED_DIR` in ein gleichgeordnetes `<name>.before-restore.<timestamp>.<pid>` umbenannt, der wiederhergestellte Ordner innerhalb desselben Volumes an seine Stelle verschoben und bei einem normalen Root-`docker exec` die konfigurierte Eigentümerschaft aus `PUID`/`PGID` angewendet.
