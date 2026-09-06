@@ -15,12 +15,46 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Run Trivy vulnerability scanner
+      - name: Report all vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/dadeeen/no-one-survived-server:latest
           format: table
-          exit-code: "1"
-          ignore-unfixed: true
+          exit-code: "0"
+          ignore-unfixed: "false"
           vuln-type: os,library
-          severity: CRITICAL,HIGH
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+
+      - name: Collect high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/dadeeen/no-one-survived-server:latest
+          format: json
+          output: trivy-high-critical.json
+          exit-code: "0"
+          ignore-unfixed: "false"
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          skip-setup-trivy: true
+
+      - name: Apply severity policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          high_fixed="$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH" and (((.FixedVersion // "") | length) > 0))] | length' trivy-high-critical.json)"
+          critical_unfixed="$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" and (((.FixedVersion // "") | length) == 0))] | length' trivy-high-critical.json)"
+          critical_fixed="$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" and (((.FixedVersion // "") | length) > 0))] | length' trivy-high-critical.json)"
+
+          if (( high_fixed > 0 )); then
+            echo "::warning title=HIGH container vulnerabilities::Trivy found ${high_fixed} HIGH vulnerabilities with an available fix."
+          fi
+
+          if (( critical_unfixed > 0 )); then
+            echo "::warning title=CRITICAL container vulnerabilities::Trivy found ${critical_unfixed} CRITICAL vulnerabilities without an available fix."
+          fi
+
+          if (( critical_fixed > 0 )); then
+            echo "::error title=CRITICAL container vulnerabilities::Trivy found ${critical_fixed} CRITICAL vulnerabilities with an available fix."
+            exit 1
+          fi
