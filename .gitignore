@@ -11,3 +11,4 @@ htmlcov/
 .DS_Store
 .vscode/
 .idea/
+.integration-data/

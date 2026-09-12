@@ -7,3 +7,4 @@ secrets
 *.tar.gz
 __pycache__
 *.pyc
+.integration-data/
