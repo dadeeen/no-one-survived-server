@@ -80,6 +80,8 @@ Die Anwendung besitzt keine externen Python-Laufzeitabhängigkeiten. Der optiona
 
 Ein fehlgeschlagener Befehl beendet den Lauf mit einem Fehlercode. Integrationscontainer und temporäres Docker-Volume werden im Aufräumpfad auch nach den meisten Fehlern entfernt.
 
+Lokale Integrationstests veröffentlichen UDP-Ports ausschließlich auf `127.0.0.1`. Der Testserver wird dadurch weder im LAN noch im Internet erreichbar.
+
 ## Release-Ablauf
 
 Veröffentlichte Images werden über einen gültigen Tag nach dem Muster `vMAJOR.MINOR.PATCH`, optional mit gültigem SemVer-Pre-Release-Zusatz, oder über einen bewusst ausgelösten manuellen Workflow erstellt. Vor dem Push eines Images führt der Release-Workflow Folgendes aus:
@@ -89,7 +91,7 @@ Veröffentlichte Images werden über einen gültigen Tag nach dem Muster `vMAJOR
 3. unveränderlichen Debian-Image-Digest ermitteln;
 4. ein Discovery-Image ohne Layer-Cache bauen;
 5. exakte WineHQ-Paketversion und SHA-256 des SteamCMD-Archivs aufzeichnen;
-6. einen zweiten Kandidaten ohne Cache mit den festgeschriebenen Hauptabhängigkeiten und den endgültigen Versionsmetadaten bauen;
+6. einen zweiten Kandidaten ohne Cache mit festgeschriebenem Debian-Digest, festgeschriebener Wine-Version und endgültigen Versionsmetadaten bauen; der SteamCMD-Archivhash wird zur Nachvollziehbarkeit aufgezeichnet und nicht als feste Eingabe verwendet;
 7. den Laufzeit-Smoke-Test gegen genau diesen Kandidaten ausführen;
 8. den lokalen BuildKit-Cache des Kandidaten exportieren und beim Publish ausschließlich diesen getesteten Cache wiederverwenden;
 9. SBOM- und Provenienz-Informationen mit dem Image veröffentlichen.

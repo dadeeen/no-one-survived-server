@@ -217,7 +217,7 @@ cp -a /work /tmp/repo
 chmod +x /tmp/repo/docker-entrypoint.sh /tmp/repo/scripts/*.sh
 chown -R nobody:nogroup /tmp/repo
 cd /tmp/repo
-bash -n docker-entrypoint.sh scripts/*.sh
+for script in docker-entrypoint.sh scripts/*.sh; do bash -n "$script" || exit; done
 runuser -u nobody -- ./scripts/test-shell-behavior.sh
 '@
 
@@ -294,8 +294,8 @@ runuser -u nobody -- ./scripts/test-shell-behavior.sh
         Invoke-Native docker @(
             "run", "-d",
             "--name", $integrationContainer,
-            "-p", "${gamePort}:7777/udp",
-            "-p", "${queryPort}:27015/udp",
+            "-p", "127.0.0.1:${gamePort}:7777/udp",
+            "-p", "127.0.0.1:${queryPort}:27015/udp",
             "-e", "PUID=1000",
             "-e", "PGID=1000",
             "-e", "USE_XVFB=true",

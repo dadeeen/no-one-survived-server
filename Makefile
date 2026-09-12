@@ -13,7 +13,7 @@ typecheck:
 	mypy --strict src/nos_server
 
 shell-check:
-	bash -n docker-entrypoint.sh scripts/*.sh
+	for script in docker-entrypoint.sh scripts/*.sh; do bash -n "$$script" || exit; done
 	./scripts/test-shell-behavior.sh
 
 check: lint typecheck test shell-check

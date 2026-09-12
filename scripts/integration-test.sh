@@ -31,8 +31,8 @@ trap handle_exit EXIT
 
 docker run -d \
   --name "$name" \
-  -p 17777:7777/udp \
-  -p 37015:27015/udp \
+  -p 127.0.0.1:17777:7777/udp \
+  -p 127.0.0.1:37015:27015/udp \
   -e PUID=1000 \
   -e PGID=1000 \
   -e USE_XVFB=true \

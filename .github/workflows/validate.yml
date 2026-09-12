@@ -45,7 +45,7 @@ jobs:
 
       - name: Validate shell scripts
         run: |
-          bash -n docker-entrypoint.sh scripts/*.sh
+          for script in docker-entrypoint.sh scripts/*.sh; do bash -n "$script" || exit; done
 
           test_root="$(mktemp -d)"
           trap 'sudo rm -rf "$test_root"' EXIT

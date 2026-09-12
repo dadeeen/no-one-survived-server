@@ -80,6 +80,8 @@ The application has no third-party Python runtime dependencies. The optional aud
 
 A failed command terminates the run with a non-zero exit. The integration container and its temporary Docker volume are removed in the cleanup path, including after most failures.
 
+Local integration tests publish UDP ports on `127.0.0.1` only. They do not make the test game accessible from the LAN or internet.
+
 ## Release workflow
 
 Published images are created from a valid `vMAJOR.MINOR.PATCH` tag, an optional valid SemVer pre-release tag or a deliberate manual workflow run. Before pushing an image, the release workflow:
@@ -89,7 +91,7 @@ Published images are created from a valid `vMAJOR.MINOR.PATCH` tag, an optional 
 3. resolves the immutable Debian image digest;
 4. builds a no-cache discovery image;
 5. records the exact WineHQ package version and SteamCMD archive SHA-256;
-6. creates a second no-cache candidate with those primary inputs pinned and the final version metadata;
+6. creates a second no-cache candidate with the Debian digest and Wine version pinned and the final version metadata; the SteamCMD archive hash is recorded for traceability, not used as a fixed input;
 7. runs the runtime smoke test against that candidate;
 8. exports the candidate's local BuildKit cache and permits the publish build to reuse only that tested cache;
 9. publishes SBOM and provenance information with the image.
