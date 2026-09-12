@@ -81,7 +81,7 @@ docker exec no-one-survived nosctl sleep
 
 Failed or interrupted updates leave a persistent marker. With `START_ON_UPDATE_FAILURE=false`, a repair update must succeed before starting, even with `UPDATE_ON_WAKE=false` or after a container restart. SteamCMD and Wine initialization respond to shutdown; silent subprocesses do not prevent heartbeats.
 
-A failed heartbeat or process setup also triggers subprocess cleanup. If publishing the game PID fails, the supervisor stops the game while retaining the data lock; if stopping fails, it keeps the process reference and lock for another cleanup attempt.
+A failed heartbeat or process setup also triggers subprocess cleanup. If publishing the game PID fails, the supervisor stops the game while retaining the data lock; if stopping fails, it keeps the process reference and lock for another cleanup attempt. A failed output-thread start does not skip the subsequent Wine shutdown checks.
 
 Updates, preparation and the entire game lifetime share a data lock with `nos-backup` and `nos-restore`. Wake waits for maintenance; periodic updates are deferred while maintenance holds the lock. Do not delete `/data/.nos-maintenance.lock` while the container or a helper accesses the volume.
 

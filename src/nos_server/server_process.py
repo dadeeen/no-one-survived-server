@@ -135,7 +135,11 @@ class ServerProcess:
     def close(self) -> None:
         self._reader_stop.set()
         reader = self._reader
-        if reader is not None and reader is not threading.current_thread():
+        if (
+            reader is not None
+            and reader.ident is not None
+            and reader is not threading.current_thread()
+        ):
             reader.join(timeout=1.0)
             if reader.is_alive():
                 print(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import signal
 import subprocess
@@ -11,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 from nos_server.server_process import ServerProcess
 from nos_server.settings import Settings
-from nos_server.wine import WINE, XVFB_RUN, wine_environment
+from nos_server.wine import WINE, WINESERVER, XVFB_RUN, wine_environment
 
 
 class ServerProcessTests(unittest.TestCase):
@@ -166,6 +167,41 @@ class ServerProcessTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(RuntimeError, "did not exit"):
                     server.stop()
+
+    def test_reader_start_failure_does_not_skip_wine_cleanup(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {"DATA_DIR": directory, "RUNTIME_DIR": f"{directory}/runtime"},
+                clear=True,
+            ),
+        ):
+            settings = Settings.from_env()
+            settings.executable.parent.mkdir(parents=True)
+            settings.executable.touch()
+            process = MagicMock()
+            process.poll.return_value = 0
+            process.returncode = 0
+            process.stdout = io.StringIO()
+            server = ServerProcess(settings)
+            with (
+                patch(
+                    "nos_server.server_process.subprocess.Popen", return_value=process
+                ),
+                patch(
+                    "nos_server.server_process.threading.Thread.start",
+                    side_effect=RuntimeError("cannot start output thread"),
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cannot start output thread"):
+                    server.start()
+            with patch("nos_server.server_process.subprocess.run") as wait_for_wine:
+                self.assertEqual(server.stop(), 0)
+            wait_for_wine.assert_called_once()
+            self.assertEqual(wait_for_wine.call_args.args[0], [WINESERVER, "-w"])
+            self.assertIsNone(server._reader)
+            self.assertTrue(process.stdout.closed)
 
     def test_close_stops_reader_even_when_pipe_writer_stays_open(self) -> None:
         with (
