@@ -121,11 +121,11 @@ Only non-empty game-setting variables overwrite values in `Game.ini`. Empty valu
 | `YEAR_DAYS` | `GameSettings.YearDay` | 1–365 |
 | `DAY_LENGTH` | `GameSettings.DayLength` | 1–240 |
 | `PERMADEATH` | `GameSettings.PermanentDead` | boolean |
-| `MATERIAL_AMOUNT` | `GameSettings.MaterialNum` | 0.1–10 |
-| `ITEM_SPAWN` | `GameSettings.ItemSpawn` | 0.1–10 |
+| `MATERIAL_AMOUNT` | `GameSettings.MaterialNum` | Integer choice 0–3 |
+| `ITEM_SPAWN` | `GameSettings.ItemSpawn` | Integer days ≥ 0; 0 disables respawn |
 | `VIRUS_FATALITY_RATE` | `GameSettings.VirusFatalityRate` | 0–1 |
 | `NOVICE_GIFT_BAG` | `GameSettings.GiftBagForNovices` | boolean |
-| `NPC_ITEM_SPAWN` | `GameSettings.NPCItemSpawn` | 0.1–10 |
+| `NPC_ITEM_SPAWN` | `GameSettings.NPCItemSpawn` | Integer days ≥ 1 |
 
 Future or uncommon settings can be supplied through `GAME_INI_OVERRIDES` as JSON:
 

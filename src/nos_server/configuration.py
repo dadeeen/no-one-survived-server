@@ -24,16 +24,16 @@ def _identity(raw: str) -> str:
     return raw
 
 
-def _int_range(minimum: int, maximum: int) -> Callable[[str], str]:
+def _int_range(minimum: int, maximum: int | None = None) -> Callable[[str], str]:
+    bounds = f"{minimum}..{maximum}" if maximum is not None else f">= {minimum}"
+
     def convert(raw: str) -> str:
         try:
             value = int(raw)
         except ValueError as exc:
-            raise SettingsError(
-                f"Expected integer {minimum}..{maximum}, got {raw!r}"
-            ) from exc
-        if not minimum <= value <= maximum:
-            raise SettingsError(f"Expected integer {minimum}..{maximum}, got {value}")
+            raise SettingsError(f"Expected integer {bounds}, got {raw!r}") from exc
+        if value < minimum or (maximum is not None and value > maximum):
+            raise SettingsError(f"Expected integer {bounds}, got {value}")
         return str(value)
 
     return convert
@@ -86,8 +86,8 @@ MAPPINGS: dict[str, tuple[str, str, Callable[[str], str], bool]] = {
     "YEAR_DAYS": ("GameSettings", "YearDay", _int_range(1, 365), False),
     "DAY_LENGTH": ("GameSettings", "DayLength", _int_range(1, 240), False),
     "PERMADEATH": ("GameSettings", "PermanentDead", _bool_text, False),
-    "MATERIAL_AMOUNT": ("GameSettings", "MaterialNum", _float_range(0.1, 10), False),
-    "ITEM_SPAWN": ("GameSettings", "ItemSpawn", _float_range(0.1, 10), False),
+    "MATERIAL_AMOUNT": ("GameSettings", "MaterialNum", _int_range(0, 3), False),
+    "ITEM_SPAWN": ("GameSettings", "ItemSpawn", _int_range(0), False),
     "VIRUS_FATALITY_RATE": (
         "GameSettings",
         "VirusFatalityRate",
@@ -95,7 +95,7 @@ MAPPINGS: dict[str, tuple[str, str, Callable[[str], str], bool]] = {
         False,
     ),
     "NOVICE_GIFT_BAG": ("GameSettings", "GiftBagForNovices", _bool_text, False),
-    "NPC_ITEM_SPAWN": ("GameSettings", "NPCItemSpawn", _float_range(0.1, 10), False),
+    "NPC_ITEM_SPAWN": ("GameSettings", "NPCItemSpawn", _int_range(1), False),
 }
 
 MANAGED_INI_KEYS = {

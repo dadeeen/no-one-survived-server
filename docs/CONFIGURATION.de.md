@@ -121,11 +121,11 @@ Nur nicht leere Spielkonfigurationsvariablen überschreiben Werte in `Game.ini`.
 | `YEAR_DAYS` | `GameSettings.YearDay` | 1–365 |
 | `DAY_LENGTH` | `GameSettings.DayLength` | 1–240 |
 | `PERMADEATH` | `GameSettings.PermanentDead` | Boolean |
-| `MATERIAL_AMOUNT` | `GameSettings.MaterialNum` | 0,1–10 |
-| `ITEM_SPAWN` | `GameSettings.ItemSpawn` | 0,1–10 |
+| `MATERIAL_AMOUNT` | `GameSettings.MaterialNum` | Ganzzahlige Auswahl 0–3 |
+| `ITEM_SPAWN` | `GameSettings.ItemSpawn` | Ganze Tage ≥ 0; 0 deaktiviert den Respawn |
 | `VIRUS_FATALITY_RATE` | `GameSettings.VirusFatalityRate` | 0–1 |
 | `NOVICE_GIFT_BAG` | `GameSettings.GiftBagForNovices` | Boolean |
-| `NPC_ITEM_SPAWN` | `GameSettings.NPCItemSpawn` | 0,1–10 |
+| `NPC_ITEM_SPAWN` | `GameSettings.NPCItemSpawn` | Ganze Tage ≥ 1 |
 
 Zukünftige oder seltene Einstellungen können über `GAME_INI_OVERRIDES` als JSON übergeben werden:
 

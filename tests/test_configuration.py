@@ -11,6 +11,42 @@ from nos_server.settings import Settings, SettingsError
 
 
 class ConfigurationTests(unittest.TestCase):
+    def test_material_amount_accepts_only_the_four_integer_choices(self) -> None:
+        for value in ("0", "1", "2", "3"):
+            with (
+                self.subTest(value=value),
+                patch.dict(os.environ, {"MATERIAL_AMOUNT": value}, clear=True),
+            ):
+                updates, _ = build_updates()
+                self.assertEqual(updates["GameSettings"]["MaterialNum"], value)
+        for value in ("-1", "4", "1.5", "nan"):
+            with (
+                self.subTest(value=value),
+                patch.dict(os.environ, {"MATERIAL_AMOUNT": value}, clear=True),
+            ):
+                with self.assertRaises(SettingsError):
+                    build_updates()
+
+    def test_respawn_intervals_are_integer_days_with_individual_minimums(self) -> None:
+        for variable, key, minimum in (
+            ("ITEM_SPAWN", "ItemSpawn", 0),
+            ("NPC_ITEM_SPAWN", "NPCItemSpawn", 1),
+        ):
+            for value in (str(minimum), "15", "365"):
+                with (
+                    self.subTest(variable=variable, value=value),
+                    patch.dict(os.environ, {variable: value}, clear=True),
+                ):
+                    updates, _ = build_updates()
+                    self.assertEqual(updates["GameSettings"][key], value)
+            for value in (str(minimum - 1), "0.5", "inf"):
+                with (
+                    self.subTest(variable=variable, value=value),
+                    patch.dict(os.environ, {variable: value}, clear=True),
+                ):
+                    with self.assertRaises(SettingsError):
+                        build_updates()
+
     def test_known_and_json_overrides(self) -> None:
         env = {
             "SERVER_NAME": "Home Server",
