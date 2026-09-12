@@ -4,6 +4,9 @@ set -Eeuo pipefail
 # when invoked through docker exec with a permissive default umask.
 umask 0077
 [[ $# -eq 1 ]] || { echo "usage: restore.sh BACKUP.tar.gz" >&2; exit 2; }
+if (( EUID == 0 )); then
+  exec gosu nos:nos "$0" "$@"
+fi
 
 DATA_DIR="${DATA_DIR:-/data}"
 SAVED_DIR="${SAVED_DIR:-${DATA_DIR}/saved}"
@@ -24,6 +27,8 @@ case "$saved_root" in
   *) echo "SAVED_DIR must be located below DATA_DIR ($data_root)" >&2; exit 2 ;;
 esac
 SAVED_DIR="$saved_root"
+exec 9>"$data_root/.nos-maintenance.lock"
+flock -n 9 || { echo "data is busy; put the game to sleep and retry after maintenance" >&2; exit 1; }
 saved_parent="$(dirname "$SAVED_DIR")"
 saved_name="$(basename "$SAVED_DIR")"
 mkdir -p "$saved_parent"
@@ -48,12 +53,10 @@ with tarfile.open(archive, "r:gz") as handle:
             raise SystemExit(f"unsupported archive entry: {member.name}")
 PY
 
-stage="${saved_parent}/.restore-stage.$$"
-previous="${saved_parent}/${saved_name}.before-restore.$(date +%s).$$"
+stage="$(mktemp -d "${saved_parent}/.restore-stage.XXXXXX")"
+previous="${saved_parent}/${saved_name}.before-restore.$(date +%s).${stage##*.}"
 cleanup() { rm -rf -- "$stage"; }
 trap cleanup EXIT
-rm -rf -- "$stage"
-mkdir -p "$stage"
 tar -C "$stage" --no-same-owner --no-same-permissions -xzf "$archive"
 [[ -d "$stage/saved" ]] || { echo "backup does not contain a saved directory" >&2; exit 2; }
 if (( EUID == 0 )); then
@@ -61,13 +64,13 @@ if (( EUID == 0 )); then
 fi
 
 if [[ -e "$SAVED_DIR" ]]; then
-  mv "$SAVED_DIR" "$previous"
+  mv -T -- "$SAVED_DIR" "$previous"
 fi
-if ! mv "$stage/saved" "$SAVED_DIR"; then
+if ! mv -T -- "$stage/saved" "$SAVED_DIR"; then
   if [[ -e "$previous" && ! -e "$SAVED_DIR" ]]; then
-    mv "$previous" "$SAVED_DIR"
+    mv -T -- "$previous" "$SAVED_DIR"
   fi
-  echo "restore swap failed; previous save data was restored" >&2
+  echo "restore swap failed; check the saved directory and retained data at $previous" >&2
   exit 1
 fi
 rm -rf -- "$stage"

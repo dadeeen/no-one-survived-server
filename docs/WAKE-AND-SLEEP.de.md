@@ -79,6 +79,14 @@ docker exec no-one-survived nosctl sleep
 
 ## Zusammenspiel mit Updates
 
+Fehlgeschlagene oder abgebrochene Updates hinterlassen eine dauerhafte Markierung. Mit `START_ON_UPDATE_FAILURE=false` muss vor dem nächsten Start ein Reparaturupdate erfolgreich sein, auch bei `UPDATE_ON_WAKE=false` oder nach einem Containerneustart. SteamCMD und Wine-Initialisierung reagieren auf das Herunterfahren; ein stiller Unterprozess verhindert keine Heartbeats.
+
+Auch ein fehlgeschlagener Heartbeat oder Fehler beim Einrichten des Prozesses löst die Bereinigung der Unterprozesse aus. Schlägt das Veröffentlichen der Spiel-PID fehl, stoppt der Supervisor das Spiel unter Beibehaltung der Datensperre. Scheitert das Stoppen, bleiben Prozessreferenz und Sperre für einen weiteren Bereinigungsversuch erhalten.
+
+Updates, Initialisierung und die gesamte Laufzeit des Spiels verwenden dieselbe Datensperre wie `nos-backup` und `nos-restore`. Ein Wake wartet auf laufende Wartung; periodische Updates werden währenddessen verschoben. Die Datei `/data/.nos-maintenance.lock` nicht löschen, solange der Container oder ein Hilfsprogramm auf das Volume zugreift.
+
+Bei ausgeschöpftem `MAX_CRASH_RESTARTS` oder `RESTART_ON_CRASH=false` bleibt der Supervisor im Zustand `ERROR` aktiv und der Healthcheck schlägt fehl. UDP und die Docker-Neustartrichtlinie starten das Spiel dann nicht erneut. `nosctl wake` oder `SIGUSR1` erlaubt einen neuen Start mit zurückgesetztem Crash-Zähler. Ein bewusst ausgelöster Containerneustart setzt den Zähler ebenfalls zurück.
+
 Empfehlung:
 
 ```env

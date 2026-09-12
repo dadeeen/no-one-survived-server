@@ -72,6 +72,33 @@ DATA_DIR="$tmp/zero-data" BACKUP_DIR="$tmp/zero-data/backups" KEEP_BACKUPS=0 \
 [[ "$(find "$tmp/zero-data/backups" -type f -name 'saved-*.tar.gz' | wc -l)" -eq 1 ]]
 
 space_backup_dir="$tmp/my  backups"
+# Helpers must reject data locked by the supervisor or another helper.
+(
+  exec 8>"$tmp/zero-data/.nos-maintenance.lock"
+  flock -n 8
+  if DATA_DIR="$tmp/zero-data" ./scripts/backup.sh >"$tmp/busy.out" 2>&1; then
+    echo "backup accepted busy data" >&2; exit 1
+  fi
+  grep -q 'data is busy' "$tmp/busy.out"
+  if DATA_DIR="$tmp/zero-data" ./scripts/restore.sh "$archive" >"$tmp/busy.out" 2>&1; then
+    echo "restore accepted busy data" >&2; exit 1
+  fi
+  grep -q 'data is busy' "$tmp/busy.out"
+)
+grep -q '^keep-all$' "$tmp/zero-data/saved/world.sav"
+# Freeze the timestamp to reproduce two backups in the same second.
+mkdir -p "$tmp/frozen-bin"
+printf '#!/bin/sh\nprintf "2026-09-12_12-00-00\\n"\n' >"$tmp/frozen-bin/date"
+chmod +x "$tmp/frozen-bin/date"
+for attempt in 1 2; do
+  PATH="$tmp/frozen-bin:$PATH" DATA_DIR="$tmp/zero-data" \
+    BACKUP_DIR="$tmp/collision-backups" KEEP_BACKUPS=0 ./scripts/backup.sh >/dev/null
+done
+[[ "$(find "$tmp/collision-backups" -name 'saved-*.tar.gz' | wc -l)" -eq 2 ]]
+if DATA_DIR="$tmp/zero-data" BACKUP_DIR="$tmp/zero-data/saved/backups" \
+  ./scripts/backup.sh >"$tmp/recursive-backup.out" 2>&1; then
+  echo "backup accepted a destination inside saved" >&2; exit 1
+fi
 DATA_DIR="$tmp/zero-data" BACKUP_DIR="$space_backup_dir" KEEP_BACKUPS=1 \
   ./scripts/backup.sh >"$tmp/backup-space-1.out"
 sleep 1

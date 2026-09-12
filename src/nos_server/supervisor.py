@@ -10,6 +10,8 @@ import traceback
 
 from .a2s import A2SError, query_info
 from .configuration import apply_configuration
+from .operations import OperationCancelled
+from .maintenance import DataLock
 from .control import ControlServer
 from .server_process import ServerProcess
 from .settings import Settings, SettingsError
@@ -29,6 +31,7 @@ class Supervisor:
         self.control = ControlServer(settings.control_socket, self.dispatch_control)
         self.server: ServerProcess | None = None
         self.prepared = False
+        self.data_lock = DataLock(settings.data_dir)
         self.last_log_player_count = 0
         self._log_activity_lock = threading.Lock()
         self._log_source: ServerProcess | None = None
@@ -103,7 +106,7 @@ class Supervisor:
     def perform_update(self, required: bool = False) -> bool:
         self.state.set_state("UPDATING", last_error=None)
         try:
-            update_server(self.settings, self.state.touch)
+            update_server(self.settings, self.state.touch, self.shutdown_event)
             print("[update] Server files are ready", flush=True)
             return True
         except UpdateError as exc:
@@ -118,14 +121,20 @@ class Supervisor:
             return False
 
     def prepare(self, initial: bool = False, update: bool = False) -> None:
+        with self.data_lock.hold(self.shutdown_event, self.state.touch):
+            self._prepare(initial, update)
+
+    def _prepare(self, initial: bool = False, update: bool = False) -> None:
         del initial
         self.state.set_state("PREPARING", last_error=None)
         self.ensure_directories()
         needs_install = not self.settings.executable.exists()
-        if update or needs_install:
+        if update or needs_install or self._update_needs_repair():
             self.perform_update(required=needs_install)
         ensure_saved_link(self.settings)
-        version = prepare_wine_prefix(self.settings, self.state.touch)
+        version = prepare_wine_prefix(
+            self.settings, self.state.touch, self.shutdown_event
+        )
         applied = apply_configuration(self.settings)
         if applied:
             print("[config] Applied: " + ", ".join(applied), flush=True)
@@ -195,7 +204,7 @@ class Supervisor:
             return self.last_log_player_count
 
     def _cancel_start_if_sleep_requested(self) -> bool:
-        if not self.sleep_event.is_set():
+        if not self.sleep_event.is_set() and not self.shutdown_event.is_set():
             return False
         self.sleep_event.clear()
         self.state.set_state(
@@ -211,7 +220,10 @@ class Supervisor:
     def start_server(self, wake_source: str | None = None) -> bool:
         self._start_in_progress = True
         try:
-            return self._start_server(wake_source)
+            with self.data_lock.hold(self.shutdown_event, self.state.touch):
+                if self._cancel_start_if_sleep_requested():
+                    return False
+                return self._start_server(wake_source)
         finally:
             self._start_in_progress = False
 
@@ -225,7 +237,7 @@ class Supervisor:
                 return False
         if self._cancel_start_if_sleep_requested():
             return False
-        if self.settings.update_on_wake:
+        if self.settings.update_on_wake or self._update_needs_repair():
             try:
                 self.perform_update(required=False)
             except UpdateError as exc:
@@ -259,44 +271,40 @@ class Supervisor:
             last_error=None,
         )
         server = ServerProcess(self.settings, self._log_activity)
-        self._activate_log_source(server)
-        try:
-            pid = server.start()
-        except BaseException:
-            self._deactivate_log_source(server)
-            try:
-                server.stop()
-            except Exception as cleanup_exc:
-                print(
-                    f"[supervisor] Failed-start cleanup failed: {cleanup_exc}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                server.close()
-            raise
+        # Retain ownership before spawning: start or status publication may fail
+        # after a child exists. Only a completed stop may release this reference.
+        self.data_lock.try_acquire()
         self.server = server
-        self.state.update(pid=pid)
-        print(f"[supervisor] Server started with PID {pid}", flush=True)
+        try:
+            self._activate_log_source(server)
+            pid = server.start()
+            self.state.update(pid=pid)
+            print(f"[supervisor] Server started with PID {pid}", flush=True)
+        except BaseException as exc:
+            try:
+                self.stop_server("failed start", preserve_state=True)
+            except Exception as cleanup_exc:
+                exc.add_note(f"Failed-start cleanup failed: {cleanup_exc}")
+            raise
         return True
 
     def stop_server(self, reason: str, *, preserve_state: bool = False) -> None:
         server = self.server
         if not server:
             return
-        if not preserve_state:
-            self.state.set_state("STOPPING", stop_reason=reason)
-        print(f"[supervisor] Stopping server: {reason}", flush=True)
-        self._deactivate_log_source(server)
-        return_code: int | None = None
         try:
-            return_code = server.stop()
-            print(
-                f"[supervisor] Server stopped with exit code {return_code}", flush=True
-            )
+            if not preserve_state:
+                self.state.set_state("STOPPING", stop_reason=reason)
+            print(f"[supervisor] Stopping server: {reason}", flush=True)
         finally:
-            server.close()
+            # Status/logging failures must not prevent cleanup. If stop fails,
+            # keep both the server reference and its lock for a later attempt.
+            self._deactivate_log_source(server)
+            return_code = server.stop()
+            self.data_lock.release()
             if self.server is server:
                 self.server = None
+            server.close()
             self.last_stop_monotonic = time.monotonic()
             self.state.update(
                 pid=None,
@@ -306,6 +314,7 @@ class Supervisor:
                 last_exit_code=return_code,
                 stop_reason=reason,
             )
+        print(f"[supervisor] Server stopped with exit code {return_code}", flush=True)
 
     def monitor_server(self) -> str:
         if self.server is None:
@@ -327,6 +336,8 @@ class Supervisor:
             return_code = server.poll()
             if return_code is not None:
                 self._deactivate_log_source(server)
+                server.stop()
+                self.data_lock.release()
                 server.close()
                 if self.server is server:
                     self.server = None
@@ -484,18 +495,21 @@ class Supervisor:
             listener.open()
             while not self.shutdown_event.is_set():
                 self.state.touch()
-                if update_due(self.settings):
+                if update_due(self.settings) and self.data_lock.try_acquire():
                     try:
-                        self.perform_update(required=False)
-                    except UpdateError as exc:
-                        print(
-                            f"[update] Periodic update failed: {exc}; remaining asleep",
-                            file=sys.stderr,
-                            flush=True,
-                        )
-                    else:
-                        ensure_saved_link(self.settings)
-                        apply_configuration(self.settings)
+                        try:
+                            self.perform_update(required=False)
+                        except UpdateError as exc:
+                            print(
+                                f"[update] Periodic update failed: {exc}; remaining asleep",
+                                file=sys.stderr,
+                                flush=True,
+                            )
+                        else:
+                            ensure_saved_link(self.settings)
+                            apply_configuration(self.settings)
+                    finally:
+                        self.data_lock.release()
                     self.state.set_state(
                         "SLEEPING",
                         wake_armed=bool(ports),
@@ -520,6 +534,35 @@ class Supervisor:
             return "shutdown"
         finally:
             listener.close()
+
+    def _update_needs_repair(self) -> bool:
+        return (
+            self.settings.incomplete_update_file.exists()
+            and not self.settings.start_on_update_failure
+        )
+
+    def _wait_for_crash_recovery(self, message: str) -> bool:
+        self.wake_event.clear()
+        self.state.set_state(
+            "ERROR",
+            last_error=message,
+            crash_restarts=self.crash_restarts,
+            recovery_required=True,
+            wake_armed=False,
+            pid=None,
+        )
+        # Keep the supervisor and control socket alive: Docker's restart policy
+        # must not silently reset the crash budget.
+        while not self.shutdown_event.is_set():
+            self.state.touch()
+            if self.wake_event.wait(1.0):
+                if self.shutdown_event.is_set():
+                    return False
+                self.wake_event.clear()
+                self.crash_restarts = 0
+                self.state.update(crash_restarts=0, recovery_required=False)
+                return True
+        return False
 
     def run(self) -> int:
         self.install_signal_handlers()
@@ -559,14 +602,20 @@ class Supervisor:
                         not self.settings.restart_on_crash
                         or self.crash_restarts > self.settings.max_crash_restarts
                     ):
-                        self.state.set_state("ERROR", last_error=message)
-                        return 1
+                        if not self._wait_for_crash_recovery(message):
+                            break
+                        start_now = True
+                        wake_source = "manual crash recovery"
+                        continue
                     self.shutdown_event.wait(self.settings.crash_restart_delay_seconds)
                     start_now = True
                     wake_source = "crash restart"
                     continue
                 self.crash_restarts = 0
                 start_now = False
+            self.state.set_state("STOPPED", pid=None, players=0, ready=False)
+            return 0
+        except OperationCancelled:
             self.state.set_state("STOPPED", pid=None, players=0, ready=False)
             return 0
         except (

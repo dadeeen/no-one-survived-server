@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import subprocess
 import tempfile
@@ -17,8 +18,9 @@ class FakeProcess:
         timeout: bool = False,
         output: list[str] | None = None,
     ) -> None:
-        self.stdout = iter(output or ["output\n"])
+        self.stdout = io.StringIO("".join(output or ["output\n"]))
         self.pid = 12345
+        self.args = ["steamcmd"]
         self.return_code = return_code
         self.timeout = timeout
         self.wait_timeouts: list[float | int | None] = []
@@ -39,6 +41,7 @@ class SteamCmdTests(unittest.TestCase):
             os.environ,
             {
                 "DATA_DIR": directory,
+                "RUNTIME_DIR": f"{directory}/runtime",
                 "STEAMCMD_TIMEOUT_SECONDS": "120",
             },
             clear=True,
@@ -63,7 +66,7 @@ class SteamCmdTests(unittest.TestCase):
             self.assertEqual(kwargs["encoding"], "utf-8")
             self.assertEqual(kwargs["errors"], "replace")
             self.assertTrue(kwargs["start_new_session"])
-            self.assertEqual(process.wait_timeouts, [120])
+            self.assertEqual(process.wait_timeouts, [1.0])
             self.assertTrue(settings.update_attempt_stamp.exists())
             self.assertTrue(settings.update_stamp.exists())
 
@@ -129,6 +132,7 @@ class SteamCmdTests(unittest.TestCase):
             with (
                 patch("nos_server.steamcmd.subprocess.Popen", return_value=process),
                 patch("nos_server.steamcmd._terminate_process_group") as terminate,
+                patch("nos_server.operations.time.monotonic", side_effect=[0, 121]),
             ):
                 with self.assertRaises(UpdateError):
                     update_server(settings)

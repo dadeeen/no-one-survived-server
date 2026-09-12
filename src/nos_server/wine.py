@@ -5,10 +5,10 @@ import shutil
 import signal
 import subprocess
 import threading
-import time
 from collections.abc import Callable
 
 from .settings import Settings
+from .operations import check_cancelled, wait_process
 
 
 WINE = "/usr/bin/wine"
@@ -51,7 +51,7 @@ def wine_environment(settings: Settings) -> dict[str, str]:
 
 def _wine_version() -> str:
     result = subprocess.run(
-        [WINE, "--version"], check=True, text=True, capture_output=True
+        [WINE, "--version"], check=True, text=True, capture_output=True, timeout=10
     )
     return result.stdout.strip()
 
@@ -63,7 +63,6 @@ def _terminate_process_group(process: subprocess.Popen[str]) -> None:
         return
     try:
         process.wait(timeout=10)
-        return
     except subprocess.TimeoutExpired:
         pass
     try:
@@ -78,9 +77,9 @@ def _terminate_process_group(process: subprocess.Popen[str]) -> None:
 
 def _stop_wineserver(env: dict[str, str]) -> None:
     try:
-        subprocess.run([WINESERVER, "-k"], env=env, check=False, timeout=30)
-        subprocess.run([WINESERVER, "-w"], env=env, check=False, timeout=120)
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        subprocess.run([WINESERVER, "-k"], env=env, check=False, timeout=10)
+        subprocess.run([WINESERVER, "-w"], env=env, check=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as exc:
         raise WineError("wineserver did not stop after prefix initialization") from exc
 
 
@@ -96,8 +95,11 @@ def _xvfb_wineboot_command() -> list[str]:
 
 
 def prepare_wine_prefix(
-    settings: Settings, heartbeat: Callable[[], None] | None = None
+    settings: Settings,
+    heartbeat: Callable[[], None] | None = None,
+    cancel: threading.Event | None = None,
 ) -> str:
+    check_cancelled(cancel)
     settings.home_dir.mkdir(parents=True, exist_ok=True)
     xdg = settings.runtime_dir / "xdg"
     xdg.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -110,10 +112,15 @@ def prepare_wine_prefix(
     except OSError:
         pass
     prefix_initialized = (settings.wine_prefix / "system.reg").exists()
-    reset = settings.reset_wineprefix or (
-        settings.reset_wineprefix_on_version_change
-        and prefix_initialized
-        and previous_version != current_version
+    incomplete = settings.state_dir / "wine-incomplete"
+    reset = (
+        settings.reset_wineprefix
+        or incomplete.exists()
+        or (
+            settings.reset_wineprefix_on_version_change
+            and prefix_initialized
+            and previous_version != current_version
+        )
     )
     if reset and settings.wine_prefix.exists():
         print(
@@ -124,6 +131,8 @@ def prepare_wine_prefix(
     settings.wine_prefix.parent.mkdir(parents=True, exist_ok=True)
     env = wine_environment(settings)
     if not (settings.wine_prefix / "system.reg").exists():
+        settings.state_dir.mkdir(parents=True, exist_ok=True)
+        incomplete.touch()
         command = [WINEBOOT, "--init"]
         if settings.use_xvfb:
             command = _xvfb_wineboot_command()
@@ -137,47 +146,43 @@ def prepare_wine_prefix(
             env=env,
             start_new_session=True,
         )
-        if process.stdout is None:
-            process.kill()
-            raise WineError("wineboot output pipe was not created")
-        stdout = process.stdout
+        reader: threading.Thread | None = None
+        try:
+            if process.stdout is None:
+                raise WineError("wineboot output pipe was not created")
+            stdout = process.stdout
 
-        def stream_output() -> None:
-            for line in stdout:
-                print(f"[wineboot] {line}", end="", flush=True)
-                if heartbeat:
-                    heartbeat()
+            def stream_output() -> None:
+                for line in stdout:
+                    print(f"[wineboot] {line}", end="", flush=True)
 
-        reader = threading.Thread(
-            target=stream_output, name="wineboot-output", daemon=True
-        )
-        reader.start()
-        deadline = time.monotonic() + settings.wineboot_timeout_seconds
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                print(
-                    f"[wine] wineboot timed out after "
-                    f"{settings.wineboot_timeout_seconds}s",
-                    flush=True,
-                )
-                _terminate_process_group(process)
-                reader.join(timeout=5)
-                raise WineError(
-                    "wineboot --init timed out after "
-                    f"{settings.wineboot_timeout_seconds} seconds"
-                )
+            reader = threading.Thread(
+                target=stream_output, name="wineboot-output", daemon=True
+            )
+            reader.start()
+            return_code = wait_process(
+                process, settings.wineboot_timeout_seconds, heartbeat, cancel
+            )
+            if return_code != 0:
+                raise WineError(f"wineboot --init failed with exit code {return_code}")
+            if not settings.use_xvfb:
+                _stop_wineserver(env)
+        except BaseException as exc:
             try:
-                return_code = process.wait(timeout=min(5.0, remaining))
-                break
-            except subprocess.TimeoutExpired:
-                if heartbeat:
-                    heartbeat()
-        reader.join(timeout=5)
-        if return_code != 0:
-            raise WineError(f"wineboot --init failed with exit code {return_code}")
-        if not settings.use_xvfb:
-            _stop_wineserver(env)
+                _terminate_process_group(process)
+            finally:
+                _stop_wineserver(env)
+            if isinstance(exc, subprocess.TimeoutExpired):
+                raise WineError(
+                    f"wineboot --init timed out after {settings.wineboot_timeout_seconds} seconds"
+                ) from exc
+            raise
+        finally:
+            if reader is not None and reader.ident is not None:
+                reader.join(timeout=5)
+            if process.stdout is not None and (reader is None or not reader.is_alive()):
+                process.stdout.close()
     settings.state_dir.mkdir(parents=True, exist_ok=True)
     settings.wine_version_file.write_text(current_version + "\n", encoding="utf-8")
+    incomplete.unlink(missing_ok=True)
     return current_version

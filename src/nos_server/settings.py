@@ -375,5 +375,9 @@ class Settings:
         return self.state_dir / "last-update-attempt"
 
     @property
+    def incomplete_update_file(self) -> Path:
+        return self.state_dir / "update-incomplete"
+
+    @property
     def wine_version_file(self) -> Path:
         return self.state_dir / "wine-version"

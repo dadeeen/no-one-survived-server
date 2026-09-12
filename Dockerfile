@@ -83,6 +83,7 @@ RUN set -eux; \
         cabextract \
         coreutils \
         findutils \
+        util-linux \
         gosu \
         gzip \
         mawk \

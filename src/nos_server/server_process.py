@@ -157,7 +157,24 @@ class ServerProcess:
     def stop(self) -> int | None:
         if self.process is None:
             return None
+        try:
+            result = self._stop_process()
+            self._wait_for_wine_exit()
+            return result
+        finally:
+            self.close()
+
+    def _wait_for_wine_exit(self) -> None:
+        env = wine_environment(self.settings)
+        try:
+            subprocess.run([WINESERVER, "-w"], env=env, check=True, timeout=10)
+        except subprocess.TimeoutExpired:
+            subprocess.run([WINESERVER, "-k"], env=env, check=True, timeout=10)
+            subprocess.run([WINESERVER, "-w"], env=env, check=True, timeout=10)
+
+    def _stop_process(self) -> int | None:
         process = self.process
+        assert process is not None
         try:
             if process.poll() is not None:
                 return process.returncode
@@ -182,7 +199,7 @@ class ServerProcess:
                     [WINESERVER, "-k"],
                     env=wine_environment(self.settings),
                     check=False,
-                    timeout=30,
+                    timeout=10,
                 )
             except (OSError, subprocess.SubprocessError) as exc:
                 print(f"[server] wineserver shutdown failed: {exc}", flush=True)
@@ -192,14 +209,7 @@ class ServerProcess:
                 pass
             try:
                 return process.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                print(
-                    "[server] Process did not exit after SIGKILL; leaving cleanup to tini",
-                    flush=True,
-                )
-                # The child has not produced an observable exit status.  Use the
-                # conventional negative signal value as an explicit forced-kill
-                # sentinel instead of recording null/"never started".
-                return -signal.SIGKILL
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError("Server did not exit after SIGKILL") from exc
         finally:
             self.close()

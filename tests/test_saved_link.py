@@ -34,7 +34,9 @@ class SavedLinkTests(unittest.TestCase):
             ensure_saved_link(settings)
             self.assertTrue(original.is_symlink())
             self.assertEqual((settings.saved_dir / "world.sav").read_text(), "world")
-            self.assertEqual((settings.saved_dir / "players.sav").read_text(), "players")
+            self.assertEqual(
+                (settings.saved_dir / "players.sav").read_text(), "players"
+            )
 
     def test_migrates_existing_server_saved_directory(self) -> None:
         with (

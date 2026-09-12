@@ -135,7 +135,7 @@ class ServerProcessTests(unittest.TestCase):
                 patch("nos_server.server_process.os.killpg") as killpg,
                 patch(
                     "nos_server.server_process.subprocess.run",
-                    side_effect=subprocess.TimeoutExpired("wineserver", 30),
+                    side_effect=[subprocess.TimeoutExpired("wineserver", 10), None],
                 ),
             ):
                 result = server.stop()
@@ -143,7 +143,7 @@ class ServerProcessTests(unittest.TestCase):
         killpg.assert_any_call(123, signal.SIGKILL)
         process.stdout.close.assert_called()
 
-    def test_stop_uses_sigkill_sentinel_when_exit_cannot_be_reaped(self) -> None:
+    def test_stop_fails_when_exit_cannot_be_reaped(self) -> None:
         with (
             tempfile.TemporaryDirectory() as directory,
             patch.dict(os.environ, {"DATA_DIR": directory}, clear=True),
@@ -164,8 +164,8 @@ class ServerProcessTests(unittest.TestCase):
                 patch("nos_server.server_process.os.killpg"),
                 patch("nos_server.server_process.subprocess.run"),
             ):
-                result = server.stop()
-        self.assertEqual(result, -signal.SIGKILL)
+                with self.assertRaisesRegex(RuntimeError, "did not exit"):
+                    server.stop()
 
     def test_close_stops_reader_even_when_pipe_writer_stays_open(self) -> None:
         with (

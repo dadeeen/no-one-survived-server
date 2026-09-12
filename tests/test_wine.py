@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import subprocess
 import tempfile
@@ -90,7 +91,7 @@ class WineTests(unittest.TestCase):
         ):
             settings = Settings.from_env()
             process = MagicMock()
-            process.stdout = iter(())
+            process.stdout = io.StringIO()
             process.wait.return_value = 0
             with (
                 patch("nos_server.wine._wine_version", return_value="wine-11.0"),
@@ -126,7 +127,7 @@ class WineTests(unittest.TestCase):
         ):
             settings = Settings.from_env()
             process = MagicMock()
-            process.stdout = iter(())
+            process.stdout = io.StringIO()
             process.wait.return_value = 0
             with (
                 patch("nos_server.wine._wine_version", return_value="wine-11.0"),
@@ -152,14 +153,15 @@ class WineTests(unittest.TestCase):
         ):
             settings = Settings.from_env()
             process = MagicMock()
-            process.stdout = iter(())
+            process.stdout = io.StringIO()
             process.pid = 123
             process.wait.side_effect = subprocess.TimeoutExpired("wineboot", 5)
             with (
                 patch("nos_server.wine._wine_version", return_value="wine-11.0"),
                 patch("nos_server.wine.subprocess.Popen", return_value=process),
-                patch("nos_server.wine.time.monotonic", side_effect=[0.0, 31.0]),
+                patch("nos_server.operations.time.monotonic", side_effect=[0.0, 31.0]),
                 patch("nos_server.wine._terminate_process_group") as terminate,
+                patch("nos_server.wine._stop_wineserver"),
             ):
                 with self.assertRaisesRegex(WineError, "timed out"):
                     prepare_wine_prefix(settings)

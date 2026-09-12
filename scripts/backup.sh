@@ -24,17 +24,27 @@ case "$saved_root" in
   *) echo "SAVED_DIR must be located below DATA_DIR ($data_root)" >&2; exit 2 ;;
 esac
 SAVED_DIR="$saved_root"
+backup_root="$(realpath -m -- "$BACKUP_DIR")"
+case "$backup_root" in
+  "$saved_root"|"$saved_root"/*) echo "BACKUP_DIR must not be inside SAVED_DIR" >&2; exit 2 ;;
+esac
+exec 9>"$data_root/.nos-maintenance.lock"
+flock -n 9 || { echo "data is busy; put the game to sleep and retry after maintenance" >&2; exit 1; }
+# Validate again after acquiring the lock: a restore may have swapped the tree.
+[[ -d "$SAVED_DIR" ]] || { echo "saved directory not found: $SAVED_DIR" >&2; exit 2; }
 mkdir -p "$BACKUP_DIR"
 timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
-archive="${BACKUP_DIR}/saved-${timestamp}.tar.gz"
 temporary="$(mktemp "${BACKUP_DIR}/.saved-${timestamp}.XXXXXX.tmp")"
+archive="${BACKUP_DIR}/$(basename "${temporary%.tmp}" | cut -c2-).tar.gz"
 cleanup() { rm -f -- "$temporary"; }
 trap cleanup EXIT
 tar -C "$SAVED_DIR" \
   --transform='s|^\./|saved/|;s|^\.$|saved|' \
   -czf "$temporary" .
 chmod 0600 "$temporary"
-mv -f -- "$temporary" "$archive"
+# A hard link publishes the completed archive atomically without overwriting.
+ln -- "$temporary" "$archive"
+rm -- "$temporary"
 trap - EXIT
 printf 'Created %s\n' "$archive"
 if (( KEEP_BACKUPS > 0 )); then

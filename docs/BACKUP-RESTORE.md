@@ -26,12 +26,14 @@ A backup inside the same Docker volume protects against bad updates but not agai
 ## Restore
 
 1. Keep the container running, put the game server process into `SLEEPING`, and verify the state with `nosctl status`.
-2. Temporarily prevent wake traffic and do not issue a manual wake during the restore. A firewall rule or temporarily removing the published UDP ports is sufficient.
+2. Wake requests automatically wait for maintenance. If a helper reports `data is busy`, retry after the game or update has stopped.
 3. Place the selected archive where the container can read it.
 4. Run:
 
    ```bash
-   docker exec no-one-survived nos-restore /data/backups/saved-YYYY-MM-DD_HH-MM-SS.tar.gz
+   docker exec no-one-survived nos-restore /data/backups/saved-YYYY-MM-DD_HH-MM-SS.ABC123.tar.gz
    ```
 
-The restore helper uses a private staging tree (`umask 0077`), validates the complete archive before changing live data, rejects paths outside `saved/`, links and special files, and extracts into a staging directory. It then renames the existing `SAVED_DIR` to a sibling `<name>.before-restore.<timestamp>.<pid>`, moves the restored directory into place on the same volume, and applies the configured `PUID`/`PGID` when invoked through the normal root-level `docker exec` command.
+Both helpers drop root privileges and use the configured container identity. They hold an exclusive data lock throughout maintenance. A running game, update or other helper causes a `data is busy` failure without changing saves. `BACKUP_DIR` must be outside `SAVED_DIR`. Unique archive names preserve multiple backups within the same second.
+
+The restore helper uses a private staging tree (`umask 0077`), validates the complete archive and rejects paths outside `saved/`, links and special files. It renames the existing `SAVED_DIR` to a sibling `<name>.before-restore.<timestamp>.<suffix>` and replaces it with the restored directory. If the swap fails, it attempts to roll back; the error identifies the retained data path.
