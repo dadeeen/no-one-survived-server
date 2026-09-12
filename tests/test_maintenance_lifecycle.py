@@ -113,6 +113,7 @@ class MaintenanceLifecycleTests(unittest.TestCase):
             self.assertTrue(entered.is_set())
 
     def test_failed_update_blocks_wake_even_after_supervisor_restart(self) -> None:
+        # UPDATE_ON_WAKE=false must not bypass a failed periodic update.
         self.settings.steamcmd_dir.mkdir(parents=True)
         (self.settings.steamcmd_dir / "steamcmd.sh").touch()
         with patch("nos_server.steamcmd._run_steamcmd", return_value=(8, False)):
@@ -134,6 +135,25 @@ class MaintenanceLifecycleTests(unittest.TestCase):
         with patch("nos_server.steamcmd._run_steamcmd", return_value=(0, False)):
             update_server(self.settings)
         self.assertFalse(self.settings.incomplete_update_file.exists())
+
+    def test_sleep_cancels_a_wake_waiting_for_maintenance(self) -> None:
+        supervisor = Supervisor(self.settings)
+        supervisor.state.set_state("SLEEPING")
+        owner = DataLock(self.directory)
+        with patch.object(supervisor, "_start_server") as start:
+            with owner.hold(threading.Event(), lambda: None):
+                thread = threading.Thread(target=supervisor.start_server)
+                thread.start()
+                deadline = time.monotonic() + 3
+                while not supervisor._start_in_progress and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(supervisor._start_in_progress)
+                self.assertEqual(
+                    supervisor.dispatch_control("sleep")["message"], "sleep requested"
+                )
+            thread.join(3)
+            self.assertFalse(thread.is_alive())
+            start.assert_not_called()
 
     def test_silent_process_has_heartbeat_and_shutdown_cancellation(self) -> None:
         cancel = threading.Event()

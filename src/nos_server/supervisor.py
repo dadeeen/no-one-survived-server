@@ -53,7 +53,11 @@ class Supervisor:
 
     def _request_sleep(self) -> dict[str, object]:
         current = self.state.snapshot().get("state")
-        if self._waiting_for_wake or current in {"SLEEPING", "STOPPING"}:
+        if (
+            self._waiting_for_wake
+            or current == "STOPPING"
+            or (current == "SLEEPING" and not self._start_in_progress)
+        ):
             return {
                 "ok": True,
                 "message": "server already sleeping",
