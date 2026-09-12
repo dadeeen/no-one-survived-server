@@ -109,11 +109,13 @@ def query_info(host: str, port: int, timeout: float = 2.0) -> ServerInfo:
             sock.settimeout(timeout)
         except (OverflowError, ValueError) as exc:
             raise A2SError(f"Invalid A2S timeout {timeout!r}: {exc}") from exc
-        sock.sendto(A2S_INFO_REQUEST, (host, port))
-        packet, _ = sock.recvfrom(65535)
+        # A connected UDP socket accepts replies only from this query endpoint.
+        sock.connect((host, port))
+        sock.send(A2S_INFO_REQUEST)
+        packet = sock.recv(65535)
         # Some servers challenge A2S_INFO with 0x41 + four-byte challenge.
         if packet.startswith(SINGLE_PACKET + b"A") and len(packet) >= 9:
             challenge = packet[5:9]
-            sock.sendto(A2S_INFO_REQUEST + challenge, (host, port))
-            packet, _ = sock.recvfrom(65535)
+            sock.send(A2S_INFO_REQUEST + challenge)
+            packet = sock.recv(65535)
         return parse_info_response(packet)

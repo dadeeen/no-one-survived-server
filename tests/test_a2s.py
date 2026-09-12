@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import struct
+import socket
+import threading
 import unittest
 
 from nos_server.a2s import A2SError, parse_info_response, query_info
@@ -35,6 +37,40 @@ def fixture_with_game_id(app_id: int) -> bytes:
 
 
 class A2STests(unittest.TestCase):
+    def test_challenge_and_reply_ignore_packets_from_other_endpoints(self) -> None:
+        with (
+            socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server,
+            socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as unrelated,
+        ):
+            server.bind(("127.0.0.1", 0))
+            server.settimeout(2)
+            received = []
+            failures = []
+
+            def respond():
+                try:
+                    request, client = server.recvfrom(65535)
+                    received.append(request)
+                    unrelated.sendto(fixture(players=0), client)
+                    server.sendto(b"\xff\xff\xff\xffAabcd", client)
+                    request, client = server.recvfrom(65535)
+                    received.append(request)
+                    unrelated.sendto(fixture(players=0), client)
+                    server.sendto(fixture(players=3), client)
+                except Exception as exc:
+                    failures.append(exc)
+
+            thread = threading.Thread(target=respond)
+            thread.start()
+            try:
+                info = query_info("127.0.0.1", server.getsockname()[1])
+            finally:
+                thread.join(3)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(failures, [])
+            self.assertEqual(info.players, 3)
+            self.assertEqual(received[1], received[0] + b"abcd")
+
     def test_parses_player_count(self) -> None:
         info = parse_info_response(fixture())
         self.assertEqual(info.name, "Test Server")
