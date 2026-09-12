@@ -6,6 +6,8 @@ The container is network-neutral. It can be used in a LAN, through a routed VPN,
 
 ## Required ports
 
+The bundled Compose file uses the same interpolation source for `GAME_PORT` and `QUERY_PORT` in both published ports and the container environment. Shell or `--env-file` overrides therefore change both together. Other runtime settings are still loaded from `.env`.
+
 | Purpose | Protocol | Default |
 |---|---|---:|
 | Game traffic and wake | UDP | 7777 |

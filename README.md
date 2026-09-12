@@ -23,6 +23,8 @@ install -d -m 0700 secrets
 printf '%s\n' 'choose-a-server-password' > secrets/server_password.txt
 printf '%s\n' 'choose-a-long-random-admin-password' > secrets/admin_password.txt
 chmod 0600 secrets/*.txt
+# Match PUID:PGID in .env (defaults below); root can omit sudo.
+sudo chown 1000:1000 secrets/*.txt
 
 docker compose -f compose.yaml -f compose.secrets.yaml up -d
 docker compose logs -f
@@ -118,7 +120,7 @@ cp .env.example .env
 docker compose -f compose.yaml -f compose.build.yaml build
 ```
 
-The runtime is built directly from the official `debian:trixie-slim` image, official WineHQ stable packages from the selected Wine 11 release line and Valve's SteamCMD bootstrap. It does not use a third-party game-server control panel or prebuilt game-server runtime. Release publication records and pins the Debian digest, WineHQ package version and SteamCMD archive hash used by the tested candidate; transitive APT packages are not frozen through a historical package snapshot.
+The runtime is built directly from the official `debian:trixie-slim` image, official WineHQ stable packages from the selected Wine 11 release line and Valve's SteamCMD bootstrap. It does not use a third-party game-server control panel or prebuilt game-server runtime. Release publication pins the Debian digest and WineHQ package version and records the SteamCMD archive hash used by the tested candidate for traceability; transitive APT packages are not frozen through a historical package snapshot.
 
 ## Validation status
 

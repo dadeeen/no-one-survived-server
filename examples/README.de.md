@@ -72,16 +72,19 @@ environment:
 
 ## Zweite Serverinstanz
 
-Einen anderen dauerhaften Portainer-Stacknamen wählen und anschließend Containername sowie Hostports ändern:
+Einen anderen dauerhaften Portainer-Stacknamen wählen und anschließend Containername, Hostports und interne Ports ändern. Die Variablen zum vorhandenen `environment:`-Block ergänzen:
 
 ```yaml
 container_name: no-one-survived-2
 ports:
-  - "7778:7777/udp"
-  - "27016:27015/udp"
+  - "7778:7778/udp"
+  - "27016:27016/udp"
+environment:
+  GAME_PORT: "7778"
+  QUERY_PORT: "27016"
 ```
 
-Die internen Ports bleiben `7777` und `27015`. Portainer weist dem zweiten Stack automatisch ein eigenes benanntes Volume zu.
+Hostports und interne Ports stimmen damit überein. Portainer weist dem zweiten Stack automatisch ein eigenes benanntes Volume zu.
 
 ## Volume- und Image-Pflege
 

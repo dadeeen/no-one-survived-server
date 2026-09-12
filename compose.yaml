@@ -12,6 +12,10 @@ services:
     # Runtime configuration is kept in .env; passwords use compose.secrets.yaml.
     env_file:
       - .env
+    # Use the same interpolation source for publishing and in-container ports.
+    environment:
+      GAME_PORT: "${GAME_PORT:-7777}"
+      QUERY_PORT: "${QUERY_PORT:-27015}"
 
     ports:
       - "${HOST_BIND_ADDRESS:-0.0.0.0}:${GAME_PORT:-7777}:${GAME_PORT:-7777}/udp"

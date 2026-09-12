@@ -13,6 +13,8 @@ Der Container ist netzwerkneutral. Er kann im LAN, über ein geroutetes VPN oder
 
 Host- und Containerports sollten identisch veröffentlicht werden:
 
+Die mitgelieferte Compose-Datei übergibt `GAME_PORT` und `QUERY_PORT` aus derselben Variablenauflösung sowohl an die Portfreigaben als auch an den Container. Überschreibungen aus der Shell oder über `--env-file` ändern dadurch beide Seiten gemeinsam. Die übrige Laufzeitkonfiguration wird weiterhin aus `.env` geladen.
+
 ```yaml
 ports:
   - "7777:7777/udp"

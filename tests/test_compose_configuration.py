@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import re
+import json
+import os
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -121,7 +126,7 @@ class ComposeConfigurationTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         self.assertIn("env_file:", text)
         self.assertIn("- .env", text)
-        self.assertNotIn("    environment:\n", text)
+        self.assertEqual(environment_keys(path), {"GAME_PORT", "QUERY_PORT"})
         self.assertEqual(
             interpolation_keys(path) - env_template_keys(ROOT / ".env.example"),
             set(),
@@ -131,6 +136,44 @@ class ComposeConfigurationTests(unittest.TestCase):
         text = (ROOT / "docs/CONFIGURATION.md").read_text(encoding="utf-8")
         missing = {key for key in SUPPORTED_ENV if f"`{key}`" not in text}
         self.assertEqual(missing, set())
+
+    def test_compose_port_overrides_match_the_container_environment(self) -> None:
+        docker = shutil.which("docker")
+        if (
+            docker is None
+            or subprocess.run(
+                [docker, "compose", "version"], capture_output=True, timeout=15
+            ).returncode
+        ):
+            self.skipTest("Docker Compose CLI is not installed")
+        with tempfile.TemporaryDirectory() as directory:
+            shutil.copyfile(ROOT / "compose.yaml", Path(directory) / "compose.yaml")
+            shutil.copyfile(ROOT / ".env.example", Path(directory) / ".env")
+            env = os.environ.copy()
+            env.update(GAME_PORT="17777", QUERY_PORT="37015")
+            rendered = subprocess.run(
+                [
+                    docker,
+                    "compose",
+                    "-f",
+                    str(Path(directory) / "compose.yaml"),
+                    "config",
+                    "--format",
+                    "json",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+        service = json.loads(rendered.stdout)["services"]["no-one-survived"]
+        ports = {
+            int(port["target"]): int(port["published"]) for port in service["ports"]
+        }
+        for key, expected in (("GAME_PORT", 17777), ("QUERY_PORT", 37015)):
+            self.assertEqual(int(service["environment"][key]), expected)
+            self.assertEqual(ports[expected], expected)
 
     def test_recommended_examples_use_smoke_tested_xvfb_path(self) -> None:
         self.assertIn("USE_XVFB=true", (ROOT / ".env.example").read_text())

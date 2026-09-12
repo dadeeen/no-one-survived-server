@@ -23,6 +23,8 @@ install -d -m 0700 secrets
 printf '%s\n' 'server-passwort-waehlen' > secrets/server_password.txt
 printf '%s\n' 'langes-zufaelliges-admin-passwort-waehlen' > secrets/admin_password.txt
 chmod 0600 secrets/*.txt
+# An PUID:PGID in .env anpassen (hier die Standardwerte); als Root ohne sudo.
+sudo chown 1000:1000 secrets/*.txt
 
 docker compose -f compose.yaml -f compose.secrets.yaml up -d
 docker compose logs -f
@@ -118,7 +120,7 @@ cp .env.example .env
 docker compose -f compose.yaml -f compose.build.yaml build
 ```
 
-Die Laufzeit wird direkt aus dem offiziellen Image `debian:trixie-slim`, den offiziellen stabilen WineHQ-Paketen der gewählten Wine-11-Linie und Valves SteamCMD-Bootstrap gebaut. Sie verwendet weder ein fremdes Gameserver-Control-Panel noch eine vorgefertigte Gameserver-Laufzeit. Bei einer Veröffentlichung werden Debian-Digest, WineHQ-Paketversion und SteamCMD-Archivhash des geprüften Kandidaten aufgezeichnet und festgeschrieben; transitive APT-Pakete werden nicht über einen historischen Paket-Snapshot eingefroren.
+Die Laufzeit wird direkt aus dem offiziellen Image `debian:trixie-slim`, den offiziellen stabilen WineHQ-Paketen der gewählten Wine-11-Linie und Valves SteamCMD-Bootstrap gebaut. Sie verwendet weder ein fremdes Gameserver-Control-Panel noch eine vorgefertigte Gameserver-Laufzeit. Bei einer Veröffentlichung werden Debian-Digest und WineHQ-Paketversion festgeschrieben; der SteamCMD-Archivhash des geprüften Kandidaten wird zur Nachvollziehbarkeit aufgezeichnet; transitive APT-Pakete werden nicht über einen historischen Paket-Snapshot eingefroren.
 
 ## Validierungsstand
 

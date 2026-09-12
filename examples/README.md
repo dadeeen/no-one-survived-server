@@ -72,16 +72,19 @@ Use `WAKE_SOURCE_POLICY: any` only deliberately for publicly reachable UDP ports
 
 ## Second server instance
 
-Choose another permanent Portainer stack name, then change the container name and host-side ports:
+Choose another permanent Portainer stack name, then change the container name, host ports and internal ports. Merge the variables into the existing `environment:` block:
 
 ```yaml
 container_name: no-one-survived-2
 ports:
-  - "7778:7777/udp"
-  - "27016:27015/udp"
+  - "7778:7778/udp"
+  - "27016:27016/udp"
+environment:
+  GAME_PORT: "7778"
+  QUERY_PORT: "27016"
 ```
 
-The internal ports remain `7777` and `27015`. Portainer automatically gives the second stack its own named volume.
+Host and internal ports now match. Portainer automatically gives the second stack its own named volume.
 
 ## Volume and image maintenance
 

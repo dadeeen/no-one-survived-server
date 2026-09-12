@@ -37,9 +37,9 @@ The listener closes before the server process is started. A short arm delay prev
 - configuration updates preserve unknown keys and comments;
 - update failure prevents startup by default.
 
-## Trust boundaries
-
 Save migrations copy into a temporary directory and publish only the complete copy. A copy failure preserves the original save for a retry.
+
+## Trust boundaries
 
 The image executes:
 
