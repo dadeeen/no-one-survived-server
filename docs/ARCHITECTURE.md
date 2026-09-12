@@ -39,6 +39,8 @@ The listener closes before the server process is started. A short arm delay prev
 
 ## Trust boundaries
 
+Save migrations copy into a temporary directory and publish only the complete copy. A copy failure preserves the original save for a retry.
+
 The image executes:
 
 - the selected official Debian base image;

@@ -5,6 +5,7 @@ import shutil
 import signal
 import subprocess
 import threading
+import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -28,7 +29,7 @@ def _copy_contents(source: Path, destination: Path) -> None:
     for item in source.iterdir():
         target = destination / item.name
         if item.is_dir() and not item.is_symlink():
-            shutil.copytree(item, target, dirs_exist_ok=True)
+            shutil.copytree(item, target, dirs_exist_ok=True, symlinks=True)
         elif item.is_symlink():
             if target.exists() or target.is_symlink():
                 target.unlink()
@@ -46,14 +47,26 @@ def ensure_saved_link(settings: Settings) -> None:
     if target.exists() or target.is_symlink():
         if target.is_dir() and not target.is_symlink():
             if not any(settings.saved_dir.iterdir()):
-                _copy_contents(target, settings.saved_dir)
+                # Publish only a complete copy. A failed copy must leave the
+                # persistent destination empty so the next attempt can retry.
+                with tempfile.TemporaryDirectory(
+                    prefix=".saved-migration-", dir=settings.saved_dir.parent
+                ) as temporary:
+                    staged = Path(temporary) / "saved"
+                    _copy_contents(target, staged)
+                    staged.replace(settings.saved_dir)
                 shutil.rmtree(target)
             else:
-                orphan = (
-                    settings.state_dir / f"orphaned-server-saved-{int(time.time())}"
-                )
-                orphan.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(target), str(orphan))
+                settings.state_dir.mkdir(parents=True, exist_ok=True)
+                orphan = Path(tempfile.mkdtemp(
+                    prefix="orphaned-server-saved-", dir=settings.state_dir
+                ))
+                try:
+                    shutil.copytree(target, orphan, dirs_exist_ok=True, symlinks=True)
+                except BaseException:
+                    shutil.rmtree(orphan)
+                    raise
+                shutil.rmtree(target)
         else:
             target.unlink()
     target.symlink_to(settings.saved_dir, target_is_directory=True)

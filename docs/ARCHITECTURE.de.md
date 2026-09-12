@@ -33,6 +33,7 @@ Der Listener schließt vor dem Start des Serverprozesses. Eine kurze Aktivierung
 - Spielstände und Konfiguration liegen außerhalb des SteamCMD-Installationsverzeichnisses;
 - `/data/server/WRSH/Saved` ist ein Symlink auf `/data/saved`;
 - ein unerwarteter echter `Saved`-Ordner wird migriert oder beiseite verschoben, niemals still gelöscht;
+- Migrationen werden zunächst vollständig in einen temporären Ordner kopiert und erst danach aktiviert; ein Kopierfehler lässt den ursprünglichen Spielstand für einen erneuten Versuch erhalten;
 - die Neuerzeugung des Wine-Prefix berührt keine Saves;
 - Konfigurationsupdates erhalten unbekannte Schlüssel und Kommentare;
 - Updatefehler verhindern standardmäßig den Start.

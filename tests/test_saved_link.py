@@ -10,6 +10,32 @@ from nos_server.steamcmd import ensure_saved_link
 
 
 class SavedLinkTests(unittest.TestCase):
+    def test_failed_migration_can_retry_without_publishing_partial_save(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"DATA_DIR": directory}, clear=True),
+        ):
+            settings = Settings.from_env()
+            original = settings.server_saved_path
+            original.mkdir(parents=True)
+            (original / "world.sav").write_text("world")
+            (original / "players.sav").write_text("players")
+
+            def partial_copy(source, destination):
+                destination.mkdir()
+                (destination / "world.sav").write_text("partial")
+                raise OSError("disk full")
+
+            with patch("nos_server.steamcmd._copy_contents", side_effect=partial_copy):
+                with self.assertRaisesRegex(OSError, "disk full"):
+                    ensure_saved_link(settings)
+            self.assertEqual(list(settings.saved_dir.iterdir()), [])
+            self.assertFalse(original.is_symlink())
+            ensure_saved_link(settings)
+            self.assertTrue(original.is_symlink())
+            self.assertEqual((settings.saved_dir / "world.sav").read_text(), "world")
+            self.assertEqual((settings.saved_dir / "players.sav").read_text(), "players")
+
     def test_migrates_existing_server_saved_directory(self) -> None:
         with (
             tempfile.TemporaryDirectory() as directory,
