@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   integration:
-    runs-on: ubuntu-latest
+    # Docker 29.4.2 on Ubuntu 26.04 blocks 32-bit SteamCMD networking (moby/moby#52506).
+    runs-on: ubuntu-24.04
     timeout-minutes: 110
     steps:
       - name: Checkout
