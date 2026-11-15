@@ -112,5 +112,19 @@ jobs:
           docker run --rm --entrypoint /usr/local/bin/nos-image-smoke \
             no-one-survived-server:ci
 
+      - name: Scan built image for OS and library vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: no-one-survived-server:ci
+          format: json
+          output: ${{ runner.temp }}/nos-image-vulnerabilities.json
+          exit-code: "0"
+          ignore-unfixed: "false"
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+
+      - name: Reject fixable HIGH and CRITICAL findings
+        run: bash scripts/check-image-vulnerabilities.sh "$RUNNER_TEMP/nos-image-vulnerabilities.json"
+
       - name: Report image size
         run: docker image inspect no-one-survived-server:ci --format '{{.Size}}'
