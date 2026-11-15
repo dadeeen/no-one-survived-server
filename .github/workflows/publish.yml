@@ -151,6 +151,22 @@ jobs:
             echo "wine_package_version=$wine_package_version"
           } >>"$GITHUB_OUTPUT"
 
+      # Fail before publication. Results are ephemeral on the Actions runner;
+      # no scan reports or other diagnostics are committed or uploaded.
+      - name: Scan release candidate before publishing
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: nos-release-candidate:${{ github.sha }}
+          format: json
+          output: ${{ runner.temp }}/nos-release-vulnerabilities.json
+          exit-code: "0"
+          ignore-unfixed: "false"
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+
+      - name: Block release with fixable HIGH or CRITICAL findings
+        run: bash scripts/check-image-vulnerabilities.sh "$RUNNER_TEMP/nos-release-vulnerabilities.json"
+
       - name: Build and push release image
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
