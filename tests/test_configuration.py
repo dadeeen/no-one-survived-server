@@ -207,6 +207,36 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(SettingsError, "managed setting"):
                 build_updates()
 
+    def test_rejects_operator_prefixed_managed_keys(self) -> None:
+        for operator in ("+", ".", "-", "!"):
+            for key in ("Password", " pAsSwOrD ", "AdminPassword"):
+                with self.subTest(operator=operator, key=key):
+                    overrides = {" sErVeRsEtTiNg ": {f" {operator}{key} ": "shadow"}}
+                    with patch.dict(
+                        os.environ,
+                        {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+                        clear=True,
+                    ):
+                        with self.assertRaisesRegex(SettingsError, "managed setting"):
+                            build_updates()
+
+    def test_unmanaged_array_operators_are_preserved(self) -> None:
+        overrides = {
+            "Future": {
+                "!MyArray": "ClearArray",
+                "+MyArray": "first",
+                ".MyArray": "first",
+                "-MyArray": "second",
+            }
+        }
+        with patch.dict(
+            os.environ,
+            {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+            clear=True,
+        ):
+            updates, _ = build_updates()
+        self.assertEqual(updates, overrides)
+
     def test_case_variant_section_with_unmanaged_key_keeps_managed_secrets(
         self,
     ) -> None:

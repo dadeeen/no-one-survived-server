@@ -133,7 +133,7 @@ Future or uncommon settings can be supplied through `GAME_INI_OVERRIDES` as JSON
 GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"AnotherValue":2}}
 ```
 
-`GAME_INI_OVERRIDES` is intentionally limited to keys that are not managed by the dedicated environment variables above. A case-insensitive collision with a managed key is rejected instead of silently shadowing values such as `Password` or `AdminPassword`.
+`GAME_INI_OVERRIDES` is intentionally limited to keys that are not managed by the dedicated environment variables above. A case-insensitive collision with a managed key is rejected instead of silently shadowing values such as `Password` or `AdminPassword`. This also applies to keys with an Unreal INI operator prefix (`+`, `.`, `-` or `!`); operators on unmanaged array keys remain supported.
 
 Section and key names must not be blank. Keys must not begin with `[`, `;` or `#`; these characters introduce section headers or comments instead of settings.
 

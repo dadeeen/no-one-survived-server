@@ -150,7 +150,10 @@ def build_updates() -> tuple[dict[str, dict[str, str]], list[str]]:
                 or any(character in key for character in ("\r", "\n", "\x00", "="))
             ):
                 raise SettingsError("Invalid INI key in GAME_INI_OVERRIDES")
-            normalized_key = (section.strip().casefold(), key.strip().casefold())
+            lookup_key = key.strip()
+            if lookup_key.startswith(("+", ".", "-", "!")):
+                lookup_key = lookup_key[1:].strip()
+            normalized_key = (section.strip().casefold(), lookup_key.casefold())
             if normalized_key in MANAGED_INI_KEYS:
                 raise SettingsError(
                     "GAME_INI_OVERRIDES must not override managed setting "

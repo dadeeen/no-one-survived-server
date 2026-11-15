@@ -133,7 +133,7 @@ Zukünftige oder seltene Einstellungen können über `GAME_INI_OVERRIDES` als JS
 GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"AnotherValue":2}}
 ```
 
-`GAME_INI_OVERRIDES` ist bewusst auf Schlüssel beschränkt, die nicht bereits über die oben aufgeführten dedizierten Umgebungsvariablen verwaltet werden. Eine Kollision mit einem verwalteten Schlüssel wird unabhängig von Groß-/Kleinschreibung abgelehnt, statt Werte wie `Password` oder `AdminPassword` still zu überschreiben.
+`GAME_INI_OVERRIDES` ist bewusst auf Schlüssel beschränkt, die nicht bereits über die oben aufgeführten dedizierten Umgebungsvariablen verwaltet werden. Eine Kollision mit einem verwalteten Schlüssel wird unabhängig von Groß-/Kleinschreibung abgelehnt, statt Werte wie `Password` oder `AdminPassword` still zu überschreiben. Dies gilt auch für Schlüssel mit einem Unreal-INI-Operatorpräfix (`+`, `.`, `-` oder `!`); Operatoren für nicht verwaltete Array-Schlüssel bleiben unterstützt.
 
 Abschnitts- und Schlüsselnamen dürfen nicht leer sein. Schlüssel dürfen nicht mit `[`, `;` oder `#` beginnen; diese Zeichen leiten Abschnittsüberschriften oder Kommentare statt Einstellungen ein.
 
