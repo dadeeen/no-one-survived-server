@@ -14,6 +14,12 @@ SAVED_DIR="${SAVED_DIR:-${DATA_DIR}/saved}"
 BACKUP_DIR="${BACKUP_DIR:-${DATA_DIR}/backups}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-5}"
 [[ "$KEEP_BACKUPS" =~ ^[0-9]+$ ]] || { echo "KEEP_BACKUPS must be a non-negative integer" >&2; exit 2; }
+KEEP_BACKUPS="${KEEP_BACKUPS#"${KEEP_BACKUPS%%[!0]*}"}"
+KEEP_BACKUPS="${KEEP_BACKUPS:-0}"
+if [[ ${#KEEP_BACKUPS} -gt 19 || ( ${#KEEP_BACKUPS} -eq 19 && "$KEEP_BACKUPS" > "9223372036854775806" ) ]]; then
+  echo "KEEP_BACKUPS is too large" >&2
+  exit 2
+fi
 [[ "$SAVED_DIR" = /* && "$SAVED_DIR" != / ]] || { echo "SAVED_DIR must be an absolute path other than /" >&2; exit 2; }
 [[ -d "$SAVED_DIR" ]] || { echo "saved directory not found: $SAVED_DIR" >&2; exit 2; }
 data_root="$(realpath -m -- "$DATA_DIR")"
