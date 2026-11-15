@@ -30,7 +30,11 @@ class ImageSecurityTests(unittest.TestCase):
             path = Path(directory) / "scan.json"
             path.write_text(json.dumps(report), encoding="utf-8")
             return subprocess.run(
-                ["bash", str(ROOT / "scripts/check-image-vulnerabilities.sh"), str(path)],
+                [
+                    "bash",
+                    str(ROOT / "scripts/check-image-vulnerabilities.sh"),
+                    str(path),
+                ],
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -59,9 +63,7 @@ class ImageSecurityTests(unittest.TestCase):
         for severity in ("HIGH", "CRITICAL"):
             with self.subTest(severity=severity):
                 result = self.run_report(
-                    self.report(
-                        [{"Severity": severity, "FixedVersion": "1.2.3"}]
-                    )
+                    self.report([{"Severity": severity, "FixedVersion": "1.2.3"}])
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn("gate passed", result.stdout)

@@ -356,6 +356,14 @@ class Settings:
                         f"{name} must not be located below {protected_name} "
                         f"({protected_root})"
                     )
+        resolved_state_file = settings.state_file.resolve(strict=False)
+        resolved_control_socket = settings.control_socket.resolve(strict=False)
+        if overlaps(resolved_state_file, resolved_control_socket):
+            raise SettingsError("STATE_FILE and CONTROL_SOCKET must not overlap")
+        maintenance_lock = (data_root / ".nos-maintenance.lock").resolve(strict=False)
+        for name, path in runtime_paths.items():
+            if overlaps(path.resolve(strict=False), maintenance_lock):
+                raise SettingsError(f"{name} must not overlap the maintenance lock")
         return settings
 
     @property
