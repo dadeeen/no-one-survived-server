@@ -78,6 +78,8 @@ RUN set -eux; \
     test "${TARGETARCH}" = "amd64"; \
     dpkg --add-architecture i386; \
     apt-get -o APT::Update::Error-Mode=any update; \
+    # Refresh preinstalled Debian packages too, not just newly installed dependencies.
+    apt-get -o APT::Keep-Downloaded-Packages="false" -y --no-install-recommends upgrade; \
     apt-get install -o APT::Keep-Downloaded-Packages="false" -y --no-install-recommends \
         bash \
         cabextract \
