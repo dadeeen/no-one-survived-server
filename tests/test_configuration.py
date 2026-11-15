@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -147,6 +148,46 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaises(SettingsError):
                 build_updates()
 
+    def test_json_keys_cannot_insert_sections_or_comments(self) -> None:
+        for key in (
+            "[ServerSetting] #",
+            " [ServerSetting] ;",
+            ";Ignored",
+            " #Ignored",
+            " \t",
+        ):
+            with self.subTest(key=key):
+                overrides = {"Future": {key: "", "Password": "shadow"}}
+                with patch.dict(
+                    os.environ,
+                    {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(SettingsError, "Invalid INI key"):
+                        build_updates()
+
+    def test_rejects_blank_json_section(self) -> None:
+        with patch.dict(
+            os.environ, {"GAME_INI_OVERRIDES": '{" ":{"Setting":1}}'}, clear=True
+        ):
+            with self.assertRaisesRegex(SettingsError, "Invalid INI section"):
+                build_updates()
+
+    def test_invalid_json_names_are_not_exposed_in_errors(self) -> None:
+        for overrides in (
+            {"private-section\n": {"Setting": 1}},
+            {"Future": {"private-key\n": 1}},
+        ):
+            with self.subTest(overrides=overrides):
+                with patch.dict(
+                    os.environ,
+                    {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+                    clear=True,
+                ):
+                    with self.assertRaises(SettingsError) as raised:
+                        build_updates()
+                self.assertNotIn("private-", str(raised.exception))
+
     def test_rejects_non_finite_json_override(self) -> None:
         for value in ("NaN", "Infinity", "-Infinity", "1e999"):
             with self.subTest(value=value):
@@ -165,6 +206,36 @@ class ConfigurationTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(SettingsError, "managed setting"):
                 build_updates()
+
+    def test_rejects_operator_prefixed_managed_keys(self) -> None:
+        for operator in ("+", ".", "-", "!"):
+            for key in ("Password", " pAsSwOrD ", "AdminPassword"):
+                with self.subTest(operator=operator, key=key):
+                    overrides = {" sErVeRsEtTiNg ": {f" {operator}{key} ": "shadow"}}
+                    with patch.dict(
+                        os.environ,
+                        {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+                        clear=True,
+                    ):
+                        with self.assertRaisesRegex(SettingsError, "managed setting"):
+                            build_updates()
+
+    def test_unmanaged_array_operators_are_preserved(self) -> None:
+        overrides = {
+            "Future": {
+                "!MyArray": "ClearArray",
+                "+MyArray": "first",
+                ".MyArray": "first",
+                "-MyArray": "second",
+            }
+        }
+        with patch.dict(
+            os.environ,
+            {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+            clear=True,
+        ):
+            updates, _ = build_updates()
+        self.assertEqual(updates, overrides)
 
     def test_case_variant_section_with_unmanaged_key_keeps_managed_secrets(
         self,

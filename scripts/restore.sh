@@ -13,8 +13,8 @@ SAVED_DIR="${SAVED_DIR:-${DATA_DIR}/saved}"
 PUID="${PUID:-1000}"
 PGID="${PGID:-1000}"
 archive="$1"
-[[ "$PUID" =~ ^[0-9]+$ ]] && (( PUID > 0 )) || { echo "PUID must be a positive integer" >&2; exit 2; }
-[[ "$PGID" =~ ^[0-9]+$ ]] && (( PGID > 0 )) || { echo "PGID must be a positive integer" >&2; exit 2; }
+[[ "$PUID" =~ ^[0-9]+$ ]] && (( 10#$PUID > 0 )) || { echo "PUID must be a positive integer" >&2; exit 2; }
+[[ "$PGID" =~ ^[0-9]+$ ]] && (( 10#$PGID > 0 )) || { echo "PGID must be a positive integer" >&2; exit 2; }
 [[ -d "$DATA_DIR" ]] || { echo "data directory not found: $DATA_DIR" >&2; exit 2; }
 [[ "$SAVED_DIR" = /* && "$SAVED_DIR" != / ]] || { echo "SAVED_DIR must be an absolute path other than /" >&2; exit 2; }
 [[ -f "$archive" ]] || { echo "backup not found: $archive" >&2; exit 2; }
@@ -55,8 +55,23 @@ PY
 
 stage="$(mktemp -d "${saved_parent}/.restore-stage.XXXXXX")"
 previous="${saved_parent}/${saved_name}.before-restore.$(date +%s).${stage##*.}"
-cleanup() { rm -rf -- "$stage"; }
+cleanup() {
+  local status=$?
+  trap - EXIT
+  trap '' HUP INT TERM
+  if [[ -e "$previous" && ! -e "$SAVED_DIR" ]]; then
+    if ! mv -T -- "$previous" "$SAVED_DIR"; then
+      echo "restore rollback failed; previous save data retained at $previous" >&2
+      status=1
+    fi
+  fi
+  rm -rf -- "$stage" || status=1
+  exit "$status"
+}
 trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 tar -C "$stage" --no-same-owner --no-same-permissions -xzf "$archive"
 [[ -d "$stage/saved" ]] || { echo "backup does not contain a saved directory" >&2; exit 2; }
 if (( EUID == 0 )); then
@@ -67,14 +82,11 @@ if [[ -e "$SAVED_DIR" ]]; then
   mv -T -- "$SAVED_DIR" "$previous"
 fi
 if ! mv -T -- "$stage/saved" "$SAVED_DIR"; then
-  if [[ -e "$previous" && ! -e "$SAVED_DIR" ]]; then
-    mv -T -- "$previous" "$SAVED_DIR"
-  fi
   echo "restore swap failed; check the saved directory and retained data at $previous" >&2
   exit 1
 fi
 rm -rf -- "$stage"
-trap - EXIT
+trap - EXIT HUP INT TERM
 printf 'Restored %s into %s\n' "$archive" "$SAVED_DIR"
 if [[ -e "$previous" ]]; then
   printf 'Previous save data retained at %s\n' "$previous"

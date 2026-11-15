@@ -73,10 +73,10 @@ class WakeListener:
         try:
             for port in self.ports:
                 listener_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self._sockets.append(listener_sock)
                 listener_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 listener_sock.bind((self.bind_address, port))
                 listener_sock.setblocking(False)
-                self._sockets.append(listener_sock)
                 selector.register(listener_sock, selectors.EVENT_READ, data=port)
         except BaseException:
             selector.close()

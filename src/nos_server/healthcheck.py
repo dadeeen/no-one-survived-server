@@ -9,6 +9,20 @@ from pathlib import Path
 from typing import Any
 
 
+HEALTHY_STATES = frozenset(
+    {
+        "INITIALIZING",
+        "PREPARING",
+        "UPDATING",
+        "SLEEPING",
+        "STARTING",
+        "RUNNING",
+        "IDLE",
+        "STOPPING",
+    }
+)
+
+
 def main() -> int:
     runtime_dir = Path(os.getenv("RUNTIME_DIR", "/run/nos"))
     configured_state_file = os.getenv("STATE_FILE", "").strip()
@@ -19,7 +33,7 @@ def main() -> int:
     )
     try:
         parsed: Any = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         print(f"state unavailable: {exc}")
         return 1
     if not isinstance(parsed, dict):
@@ -29,10 +43,14 @@ def main() -> int:
     if state.get("state") == "ERROR":
         print(state.get("last_error") or "supervisor error")
         return 1
+    current_state = state.get("state")
+    if not isinstance(current_state, str) or current_state not in HEALTHY_STATES:
+        print("invalid health-check state: supervisor is stopped or state is unknown")
+        return 1
     try:
         max_age = int(os.getenv("HEALTHCHECK_MAX_HEARTBEAT_AGE", "600"))
         heartbeat = float(state.get("heartbeat", 0))
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         print(f"invalid health-check configuration or state: {exc}")
         return 1
     if max_age <= 0:

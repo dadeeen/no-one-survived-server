@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -64,6 +65,23 @@ class StateStoreTests(unittest.TestCase):
         self.assertTrue(temporary.name.startswith(".custom.state.json."))
         self.assertTrue(temporary.name.endswith(".tmp"))
         self.assertEqual(mode, 0o600)
+
+    def test_heartbeat_recovers_after_clock_moves_backwards(self) -> None:
+        for method, args in (
+            ("touch", ()),
+            ("update", ()),
+            ("set_state", ("SLEEPING",)),
+        ):
+            with self.subTest(method=method):
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "state.json"
+                    with patch("nos_server.state.time.time", return_value=2000.0):
+                        state = StateStore(path)
+                        state.set_state("SLEEPING")
+                    with patch("nos_server.state.time.time", return_value=1000.0):
+                        getattr(state, method)(*args)
+                    persisted = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(persisted["heartbeat"], 1000.0)
 
 
 if __name__ == "__main__":

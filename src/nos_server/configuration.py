@@ -137,20 +137,23 @@ def build_updates() -> tuple[dict[str, dict[str, str]], list[str]]:
     for section, values in extra.items():
         if not isinstance(section, str) or not isinstance(values, dict):
             raise SettingsError("GAME_INI_OVERRIDES must map section names to objects")
-        if not section or any(
+        if not section.strip() or any(
             character in section for character in ("\r", "\n", "\x00", "[", "]")
         ):
-            raise SettingsError(
-                f"Invalid INI section name in GAME_INI_OVERRIDES: {section!r}"
-            )
+            raise SettingsError("Invalid INI section name in GAME_INI_OVERRIDES")
         for key, value in values.items():
             if not isinstance(key, str) or isinstance(value, (dict, list)):
                 raise SettingsError("GAME_INI_OVERRIDES values must be scalar")
-            if not key or any(
-                character in key for character in ("\r", "\n", "\x00", "=")
+            if (
+                not key.strip()
+                or key.lstrip().startswith(("[", ";", "#"))
+                or any(character in key for character in ("\r", "\n", "\x00", "="))
             ):
-                raise SettingsError(f"Invalid INI key in GAME_INI_OVERRIDES: {key!r}")
-            normalized_key = (section.strip().casefold(), key.strip().casefold())
+                raise SettingsError("Invalid INI key in GAME_INI_OVERRIDES")
+            lookup_key = key.strip()
+            if lookup_key.startswith(("+", ".", "-", "!")):
+                lookup_key = lookup_key[1:].strip()
+            normalized_key = (section.strip().casefold(), lookup_key.casefold())
             if normalized_key in MANAGED_INI_KEYS:
                 raise SettingsError(
                     "GAME_INI_OVERRIDES must not override managed setting "

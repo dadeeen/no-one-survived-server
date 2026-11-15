@@ -95,4 +95,4 @@ UPDATE_ON_WAKE=false
 UPDATE_INTERVAL_SECONDS=0
 ```
 
-Damit wird der Server beim Containerstart aktualisiert und spätere Wake-Vorgänge bleiben schnell. Ein Updateintervall größer null führt SteamCMD im Schlafzustand aus. `UPDATE_ON_WAKE=true` verbessert die Versionssicherheit, kann aber jeden Wake deutlich verlängern.
+Damit wird der Server beim Containerstart aktualisiert und spätere Wake-Vorgänge bleiben schnell. Ein Updateintervall größer null führt SteamCMD im Schlafzustand aus. Ungültige und laut Host-Uhr in der Zukunft liegende Zeitstempel werden bei der Updateplanung ignoriert. `UPDATE_ON_WAKE=true` verbessert die Versionssicherheit, kann aber jeden Wake deutlich verlängern.

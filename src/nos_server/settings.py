@@ -356,6 +356,26 @@ class Settings:
                         f"{name} must not be located below {protected_name} "
                         f"({protected_root})"
                     )
+        resolved_state_file = settings.state_file.resolve(strict=False)
+        resolved_control_socket = settings.control_socket.resolve(strict=False)
+        if overlaps(resolved_state_file, resolved_control_socket):
+            raise SettingsError("STATE_FILE and CONTROL_SOCKET must not overlap")
+        protected_runtime_files = {
+            "the maintenance lock": data_root / ".nos-maintenance.lock",
+            "the update timestamp": settings.update_stamp,
+            "the update-attempt timestamp": settings.update_attempt_stamp,
+            "the incomplete-update marker": settings.incomplete_update_file,
+            "the Wine-version marker": settings.wine_version_file,
+            "the incomplete-Wine marker": settings.state_dir / "wine-incomplete",
+            "the generated admin password": (
+                settings.state_dir / "generated-admin-password"
+            ),
+        }
+        for name, path in runtime_paths.items():
+            resolved = path.resolve(strict=False)
+            for protected_name, protected_path in protected_runtime_files.items():
+                if overlaps(resolved, protected_path.resolve(strict=False)):
+                    raise SettingsError(f"{name} must not overlap {protected_name}")
         return settings
 
     @property

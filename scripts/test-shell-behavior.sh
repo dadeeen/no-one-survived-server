@@ -14,6 +14,12 @@ if DATA_DIR=/ bash ./docker-entrypoint.sh true >"$tmp/entrypoint.out" 2>&1; then
 fi
 grep -q 'DATA_DIR must be an absolute path other than /' "$tmp/entrypoint.out"
 
+if PUID=08 PGID=09 DATA_DIR=/ bash ./docker-entrypoint.sh true >"$tmp/decimal-id.out" 2>&1; then
+  echo "entrypoint safety test unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -q 'DATA_DIR must be an absolute path other than /' "$tmp/decimal-id.out"
+
 if FIX_PERMISSIONS=invalid DATA_DIR=/safe RUNTIME_DIR=/run/nos \
   bash ./docker-entrypoint.sh true >"$tmp/boolean.out" 2>&1; then
   echo "entrypoint boolean validation unexpectedly succeeded" >&2

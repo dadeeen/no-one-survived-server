@@ -11,6 +11,49 @@ from nos_server.steamcmd import UpdateError, update_due, update_server
 
 
 class UpdateDueTests(unittest.TestCase):
+    def test_invalid_or_future_timestamps_do_not_postpone_updates(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {
+                    "DATA_DIR": directory,
+                    "UPDATE_INTERVAL_SECONDS": "60",
+                    "UPDATE_RETRY_DELAY_SECONDS": "30",
+                },
+                clear=True,
+            ),
+        ):
+            settings = Settings.from_env()
+            settings.state_dir.mkdir(parents=True)
+            for timestamp in ("inf", "-inf", "nan", "2000"):
+                with self.subTest(timestamp=timestamp):
+                    settings.update_stamp.write_text(timestamp, encoding="ascii")
+                    settings.update_attempt_stamp.write_text(
+                        timestamp, encoding="ascii"
+                    )
+                    self.assertTrue(update_due(settings, now=1000.0))
+
+    def test_future_success_keeps_recent_failure_backoff(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {
+                    "DATA_DIR": directory,
+                    "UPDATE_INTERVAL_SECONDS": "60",
+                    "UPDATE_RETRY_DELAY_SECONDS": "30",
+                },
+                clear=True,
+            ),
+        ):
+            settings = Settings.from_env()
+            settings.state_dir.mkdir(parents=True)
+            settings.update_stamp.write_text("2000", encoding="ascii")
+            settings.update_attempt_stamp.write_text("990", encoding="ascii")
+            self.assertFalse(update_due(settings, now=1000.0))
+            self.assertTrue(update_due(settings, now=1021.0))
+
     def test_disabled_interval_is_never_due(self) -> None:
         with (
             tempfile.TemporaryDirectory() as directory,

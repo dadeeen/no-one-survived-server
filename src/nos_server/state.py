@@ -73,10 +73,11 @@ class StateStore:
                 if key not in self._data or self._data[key] != value:
                     self._data[key] = value
                     changed = True
+            heartbeat_age = now - float(self._data.get("heartbeat", 0))
             if (
                 changed
-                or now - float(self._data.get("heartbeat", 0))
-                >= HEARTBEAT_WRITE_INTERVAL_SECONDS
+                or heartbeat_age < 0
+                or heartbeat_age >= HEARTBEAT_WRITE_INTERVAL_SECONDS
             ):
                 self._data["heartbeat"] = now
                 self._write_locked()
@@ -89,10 +90,11 @@ class StateStore:
                 if key not in self._data or self._data[key] != value:
                     self._data[key] = value
                     changed = True
+            heartbeat_age = now - float(self._data.get("heartbeat", 0))
             if (
                 changed
-                or now - float(self._data.get("heartbeat", 0))
-                >= HEARTBEAT_WRITE_INTERVAL_SECONDS
+                or heartbeat_age < 0
+                or heartbeat_age >= HEARTBEAT_WRITE_INTERVAL_SECONDS
             ):
                 self._data["heartbeat"] = now
                 self._write_locked()
@@ -100,7 +102,7 @@ class StateStore:
     def touch(self, minimum_interval: float = HEARTBEAT_WRITE_INTERVAL_SECONDS) -> None:
         with self._lock:
             now = time.time()
-            if now - float(self._data.get("heartbeat", 0)) < minimum_interval:
+            if 0 <= now - float(self._data.get("heartbeat", 0)) < minimum_interval:
                 return
             self._data["heartbeat"] = now
             self._write_locked()

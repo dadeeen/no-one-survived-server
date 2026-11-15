@@ -14,6 +14,12 @@ SAVED_DIR="${SAVED_DIR:-${DATA_DIR}/saved}"
 BACKUP_DIR="${BACKUP_DIR:-${DATA_DIR}/backups}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-5}"
 [[ "$KEEP_BACKUPS" =~ ^[0-9]+$ ]] || { echo "KEEP_BACKUPS must be a non-negative integer" >&2; exit 2; }
+KEEP_BACKUPS="${KEEP_BACKUPS#"${KEEP_BACKUPS%%[!0]*}"}"
+KEEP_BACKUPS="${KEEP_BACKUPS:-0}"
+if [[ ${#KEEP_BACKUPS} -gt 19 || ( ${#KEEP_BACKUPS} -eq 19 && "$KEEP_BACKUPS" > "9223372036854775806" ) ]]; then
+  echo "KEEP_BACKUPS is too large" >&2
+  exit 2
+fi
 [[ "$SAVED_DIR" = /* && "$SAVED_DIR" != / ]] || { echo "SAVED_DIR must be an absolute path other than /" >&2; exit 2; }
 [[ -d "$SAVED_DIR" ]] || { echo "saved directory not found: $SAVED_DIR" >&2; exit 2; }
 data_root="$(realpath -m -- "$DATA_DIR")"
@@ -32,13 +38,15 @@ exec 9>"$data_root/.nos-maintenance.lock"
 flock -n 9 || { echo "data is busy; put the game to sleep and retry after maintenance" >&2; exit 1; }
 # Validate again after acquiring the lock: a restore may have swapped the tree.
 [[ -d "$SAVED_DIR" ]] || { echo "saved directory not found: $SAVED_DIR" >&2; exit 2; }
+unsupported="$(find "$SAVED_DIR" ! -type d ! -type f -print -quit)"
+[[ -z "$unsupported" ]] || { echo "SAVED_DIR contains a link or special file: $unsupported" >&2; exit 2; }
 mkdir -p "$BACKUP_DIR"
 timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
 temporary="$(mktemp "${BACKUP_DIR}/.saved-${timestamp}.XXXXXX.tmp")"
 archive="${BACKUP_DIR}/$(basename "${temporary%.tmp}" | cut -c2-).tar.gz"
 cleanup() { rm -f -- "$temporary"; }
 trap cleanup EXIT
-tar -C "$SAVED_DIR" \
+tar -C "$SAVED_DIR" --hard-dereference \
   --transform='s|^\./|saved/|;s|^\.$|saved|' \
   -czf "$temporary" .
 chmod 0600 "$temporary"
