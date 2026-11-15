@@ -38,13 +38,15 @@ exec 9>"$data_root/.nos-maintenance.lock"
 flock -n 9 || { echo "data is busy; put the game to sleep and retry after maintenance" >&2; exit 1; }
 # Validate again after acquiring the lock: a restore may have swapped the tree.
 [[ -d "$SAVED_DIR" ]] || { echo "saved directory not found: $SAVED_DIR" >&2; exit 2; }
+unsupported="$(find "$SAVED_DIR" ! -type d ! -type f -print -quit)"
+[[ -z "$unsupported" ]] || { echo "SAVED_DIR contains a link or special file: $unsupported" >&2; exit 2; }
 mkdir -p "$BACKUP_DIR"
 timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
 temporary="$(mktemp "${BACKUP_DIR}/.saved-${timestamp}.XXXXXX.tmp")"
 archive="${BACKUP_DIR}/$(basename "${temporary%.tmp}" | cut -c2-).tar.gz"
 cleanup() { rm -f -- "$temporary"; }
 trap cleanup EXIT
-tar -C "$SAVED_DIR" \
+tar -C "$SAVED_DIR" --hard-dereference \
   --transform='s|^\./|saved/|;s|^\.$|saved|' \
   -czf "$temporary" .
 chmod 0600 "$temporary"

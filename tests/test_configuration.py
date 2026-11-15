@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -146,6 +147,46 @@ class ConfigurationTests(unittest.TestCase):
         ):
             with self.assertRaises(SettingsError):
                 build_updates()
+
+    def test_json_keys_cannot_insert_sections_or_comments(self) -> None:
+        for key in (
+            "[ServerSetting] #",
+            " [ServerSetting] ;",
+            ";Ignored",
+            " #Ignored",
+            " \t",
+        ):
+            with self.subTest(key=key):
+                overrides = {"Future": {key: "", "Password": "shadow"}}
+                with patch.dict(
+                    os.environ,
+                    {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(SettingsError, "Invalid INI key"):
+                        build_updates()
+
+    def test_rejects_blank_json_section(self) -> None:
+        with patch.dict(
+            os.environ, {"GAME_INI_OVERRIDES": '{" ":{"Setting":1}}'}, clear=True
+        ):
+            with self.assertRaisesRegex(SettingsError, "Invalid INI section"):
+                build_updates()
+
+    def test_invalid_json_names_are_not_exposed_in_errors(self) -> None:
+        for overrides in (
+            {"private-section\n": {"Setting": 1}},
+            {"Future": {"private-key\n": 1}},
+        ):
+            with self.subTest(overrides=overrides):
+                with patch.dict(
+                    os.environ,
+                    {"GAME_INI_OVERRIDES": json.dumps(overrides)},
+                    clear=True,
+                ):
+                    with self.assertRaises(SettingsError) as raised:
+                        build_updates()
+                self.assertNotIn("private-", str(raised.exception))
 
     def test_rejects_non_finite_json_override(self) -> None:
         for value in ("NaN", "Infinity", "-Infinity", "1e999"):

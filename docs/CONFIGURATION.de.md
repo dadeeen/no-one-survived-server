@@ -135,6 +135,8 @@ GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"A
 
 `GAME_INI_OVERRIDES` ist bewusst auf Schlüssel beschränkt, die nicht bereits über die oben aufgeführten dedizierten Umgebungsvariablen verwaltet werden. Eine Kollision mit einem verwalteten Schlüssel wird unabhängig von Groß-/Kleinschreibung abgelehnt, statt Werte wie `Password` oder `AdminPassword` still zu überschreiben.
 
+Abschnitts- und Schlüsselnamen dürfen nicht leer sein. Schlüssel dürfen nicht mit `[`, `;` oder `#` beginnen; diese Zeichen leiten Abschnittsüberschriften oder Kommentare statt Einstellungen ein.
+
 Für komplexes oder sensibles JSON steht `GAME_INI_OVERRIDES_FILE` zur Verfügung. Die referenzierte Datei muss in den Container eingebunden und für die konfigurierte `PUID` lesbar sein; die mitgelieferten Beispiele binden beliebige Override-Dateien nicht automatisch ein.
 
 ### Passwörter
@@ -177,10 +179,12 @@ Die mitgelieferten Compose- und Portainer-Stacks binden das benannte Volume bewu
 | `NOSCTL_TIMEOUT_SECONDS` | `5` | Maximale Verbindungs- und Lesezeit eines `nosctl`-Aufrufs. Muss eine positive endliche Zahl sein. |
 | `HEALTHCHECK_MAX_HEARTBEAT_AGE` | `600` | Maximales Alter des Heartbeats in Sekunden, bevor der Container als ungesund gilt. |
 
+`STATE_FILE` und `CONTROL_SOCKET` dürfen sich weder gegenseitig noch mit dem Wartungs-Lock, persistenten Update-/Wine-Markern oder der Datei des erzeugten Admin-Passworts überlappen.
+
 ```bash
 docker exec no-one-survived nosctl status
 docker exec no-one-survived nosctl wake
 docker exec no-one-survived nosctl sleep
 ```
 
-Der Healthcheck betrachtet `SLEEPING` als gesund. Er schlägt bei `ERROR`, einer fehlenden oder ungültigen Statusdatei, einer ungültigen Heartbeat-Konfiguration oder einem veralteten Heartbeat fehl. Fehler beim Start des Steuer-Sockets werden als Supervisor-Zustand `ERROR` protokolliert, statt vor der Aufräumlogik ungefangen abzubrechen.
+Der Healthcheck betrachtet `SLEEPING` als gesund. Er schlägt bei `ERROR`, `STOPPED`, unbekannten oder fehlenden Zuständen, einer fehlenden oder ungültigen Statusdatei, einer ungültigen Heartbeat-Konfiguration oder einem veralteten Heartbeat fehl. Fehler beim Start des Steuer-Sockets werden als Supervisor-Zustand `ERROR` protokolliert, statt vor der Aufräumlogik ungefangen abzubrechen.

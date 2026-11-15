@@ -135,6 +135,8 @@ GAME_INI_OVERRIDES={"ServerSetting":{"FutureSetting":"Value"},"GameSettings":{"A
 
 `GAME_INI_OVERRIDES` is intentionally limited to keys that are not managed by the dedicated environment variables above. A case-insensitive collision with a managed key is rejected instead of silently shadowing values such as `Password` or `AdminPassword`.
 
+Section and key names must not be blank. Keys must not begin with `[`, `;` or `#`; these characters introduce section headers or comments instead of settings.
+
 For complex or sensitive JSON use `GAME_INI_OVERRIDES_FILE`. The referenced file must be mounted into the container and readable by the configured `PUID`; the supplied examples do not automatically mount arbitrary override files.
 
 ### Passwords
@@ -177,10 +179,12 @@ The supplied Compose and Portainer stacks deliberately mount the named volume at
 | `NOSCTL_TIMEOUT_SECONDS` | `5` | Maximum connect/read time for one `nosctl` request. Must be a positive finite number. |
 | `HEALTHCHECK_MAX_HEARTBEAT_AGE` | `600` | Maximum heartbeat age in seconds before the container becomes unhealthy. |
 
+`STATE_FILE` and `CONTROL_SOCKET` must not overlap each other, the maintenance lock, persistent update/Wine markers or the generated admin-password file.
+
 ```bash
 docker exec no-one-survived nosctl status
 docker exec no-one-survived nosctl wake
 docker exec no-one-survived nosctl sleep
 ```
 
-The health check considers `SLEEPING` healthy. It fails for `ERROR`, a missing/invalid state file, invalid heartbeat configuration or a stale heartbeat. Control-socket startup errors are recorded as supervisor `ERROR` state instead of escaping before cleanup.
+The health check considers `SLEEPING` healthy. It fails for `ERROR`, `STOPPED`, unknown or missing states, a missing/invalid state file, invalid heartbeat configuration or a stale heartbeat. Control-socket startup errors are recorded as supervisor `ERROR` state instead of escaping before cleanup.

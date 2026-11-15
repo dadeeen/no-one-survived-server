@@ -14,6 +14,82 @@ from nos_server import healthcheck
 
 
 class HealthcheckTests(unittest.TestCase):
+    def test_rejects_inactive_or_unknown_state(self) -> None:
+        states = (
+            {},
+            {"state": "STOPPED"},
+            {"state": "ERROR"},
+            {"state": "unknown"},
+            {"state": None},
+            {"state": []},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            for state in states:
+                with self.subTest(state=state):
+                    path.write_text(
+                        json.dumps({**state, "heartbeat": time.time()}),
+                        encoding="utf-8",
+                    )
+                    with (
+                        patch.dict(os.environ, {"STATE_FILE": str(path)}, clear=True),
+                        redirect_stdout(io.StringIO()),
+                    ):
+                        self.assertEqual(healthcheck.main(), 1)
+
+    def test_accepts_each_active_supervisor_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            for state in (
+                "INITIALIZING",
+                "PREPARING",
+                "UPDATING",
+                "SLEEPING",
+                "STARTING",
+                "RUNNING",
+                "IDLE",
+                "STOPPING",
+            ):
+                with self.subTest(state=state):
+                    path.write_text(
+                        json.dumps({"state": state, "heartbeat": time.time()}),
+                        encoding="utf-8",
+                    )
+                    with (
+                        patch.dict(os.environ, {"STATE_FILE": str(path)}, clear=True),
+                        redirect_stdout(io.StringIO()),
+                    ):
+                        self.assertEqual(healthcheck.main(), 0)
+
+    def test_rejects_invalid_utf8_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            path.write_bytes(b"\xff\n")
+            output = io.StringIO()
+            with (
+                patch.dict(os.environ, {"STATE_FILE": str(path)}, clear=True),
+                redirect_stdout(output),
+            ):
+                self.assertEqual(healthcheck.main(), 1)
+            self.assertIn("state unavailable", output.getvalue())
+
+    def test_rejects_overflowing_heartbeat(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            path.write_text(
+                json.dumps({"state": "SLEEPING", "heartbeat": 10**400}),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with (
+                patch.dict(os.environ, {"STATE_FILE": str(path)}, clear=True),
+                redirect_stdout(output),
+            ):
+                self.assertEqual(healthcheck.main(), 1)
+            self.assertIn(
+                "invalid health-check configuration or state", output.getvalue()
+            )
+
     def test_rejects_non_object_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"

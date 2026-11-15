@@ -95,4 +95,4 @@ UPDATE_ON_WAKE=false
 UPDATE_INTERVAL_SECONDS=0
 ```
 
-This prepares a current server once when the container starts and keeps later wake latency low. A nonzero update interval runs SteamCMD while sleeping. `UPDATE_ON_WAKE=true` is safest for version matching but can turn each wake into a long update.
+This prepares a current server once when the container starts and keeps later wake latency low. A nonzero update interval runs SteamCMD while sleeping. Invalid timestamps and timestamps ahead of the host clock are ignored when scheduling updates. `UPDATE_ON_WAKE=true` is safest for version matching but can turn each wake into a long update.

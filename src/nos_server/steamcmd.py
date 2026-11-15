@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import signal
@@ -83,9 +84,10 @@ def _write_timestamp(path: Path, timestamp: float | None = None) -> None:
 
 def _read_timestamp(path: Path) -> float | None:
     try:
-        return float(path.read_text(encoding="ascii").strip())
+        value = float(path.read_text(encoding="ascii").strip())
     except (OSError, ValueError):
         return None
+    return value if math.isfinite(value) else None
 
 
 def _terminate_process_group(process: subprocess.Popen[str]) -> None:
@@ -254,6 +256,10 @@ def update_due(settings: Settings, now: float | None = None) -> bool:
     current = time.time() if now is None else now
     last_success = _read_timestamp(settings.update_stamp)
     last_attempt = _read_timestamp(settings.update_attempt_stamp)
+    if last_success is not None and last_success > current:
+        last_success = None
+    if last_attempt is not None and last_attempt > current:
+        last_attempt = None
 
     if (
         last_success is not None

@@ -10,8 +10,8 @@ UMASK="${UMASK:-0027}"
 FIX_PERMISSIONS_VALUE="${FIX_PERMISSIONS:-true}"
 FIX_PERMISSIONS_VALUE="${FIX_PERMISSIONS_VALUE,,}"
 
-[[ "$PUID" =~ ^[0-9]+$ ]] && (( PUID > 0 )) || { echo "PUID must be a positive integer" >&2; exit 2; }
-[[ "$PGID" =~ ^[0-9]+$ ]] && (( PGID > 0 )) || { echo "PGID must be a positive integer" >&2; exit 2; }
+[[ "$PUID" =~ ^[0-9]+$ ]] && (( 10#$PUID > 0 )) || { echo "PUID must be a positive integer" >&2; exit 2; }
+[[ "$PGID" =~ ^[0-9]+$ ]] && (( 10#$PGID > 0 )) || { echo "PGID must be a positive integer" >&2; exit 2; }
 [[ "$UMASK" =~ ^0?[0-7]{3}$ ]] || { echo "UMASK must be a three- or four-digit octal mask" >&2; exit 2; }
 case "$FIX_PERMISSIONS_VALUE" in
   1|true|yes|on|y) FIX_PERMISSIONS_VALUE=true ;;
