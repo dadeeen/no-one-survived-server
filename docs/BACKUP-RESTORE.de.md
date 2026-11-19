@@ -38,4 +38,10 @@ Beide Hilfsprogramme legen Root-Rechte ab und verwenden die konfigurierte Contai
 
 Backups lehnen symbolische Links und Spezialdateien ab, bevor ein Archiv erstellt oder ein älteres Backup gelöscht wird. Reguläre Dateien mit Hardlinks werden unabhängig voneinander gespeichert, damit das Archiv sicher wiederhergestellt werden kann.
 
-Das Restore-Hilfsprogramm verwendet einen privaten Staging-Baum (`umask 0077`), prüft das vollständige Archiv und lehnt Pfade außerhalb von `saved/`, Links und Spezialdateien ab. Anschließend wird das bestehende `SAVED_DIR` in ein gleichgeordnetes `<name>.before-restore.<timestamp>.<suffix>` umbenannt und durch den wiederhergestellten Ordner ersetzt. Bei einem fehlgeschlagenen Austausch oder Abbruch durch `SIGHUP`, `SIGINT` oder `SIGTERM` vor Abschluss des Austauschs versucht es, den bisherigen Ordner zurückzusetzen. Schlägt dies fehl, nennt die Fehlermeldung den Pfad der erhaltenen Daten. `SIGKILL` und ein Host-Absturz lassen sich nicht abfangen; in diesen Fällen vor dem Aufwecken des Servers nach dem erhaltenen Ordner suchen.
+Vor dem Austausch prüft `nos-restore` das gesamte Archiv und entpackt es in ein privates Verzeichnis (`umask 0077`). Es lehnt Pfade außerhalb von `saved/`, Links und Spezialdateien ab.
+
+### Wo liegen die bisherigen Spielstände nach einem Abbruch?
+
+Beim Austausch benennt `nos-restore` den bisherigen Spielstandordner um. Er liegt neben `SAVED_DIR` und heißt beim Standardpfad `/data/saved.before-restore.<timestamp>.<suffix>`. Scheitert der Austausch oder wird er durch `SIGHUP`, `SIGINT` oder `SIGTERM` unterbrochen, versucht das Skript, den bisherigen Ordner wieder unter `SAVED_DIR` einzusetzen. Schlägt das fehl, nennt die Fehlermeldung den Pfad der erhaltenen Daten.
+
+Nach `SIGKILL` oder einem Host-Absturz kann die automatische Rücknahme ausbleiben. Vor dem nächsten Aufwecken `SAVED_DIR` und dessen übergeordnetes Verzeichnis auf den erhaltenen Spielstandordner prüfen.

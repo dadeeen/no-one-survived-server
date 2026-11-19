@@ -31,25 +31,7 @@ Gezählt wird je Quell-IP, nicht global. Pakete verschiedener Quellen werden nic
 
 ## Wake-Quellrichtlinie
 
-Der empfohlene Standard ist bewusst einfach:
-
-```env
-WAKE_SOURCE_POLICY=private
-WAKE_ALLOWED_NETWORKS=
-```
-
-`private` vertraut üblichen LAN-, Docker- und Overlay-IPv4-Bereichen und lehnt öffentliche IPv4-Quellen ab. Optionale Einträge in `WAKE_ALLOWED_NETWORKS` ergänzen diese eingebauten Bereiche.
-
-Für eine strikte Liste:
-
-```env
-WAKE_SOURCE_POLICY=allowlist
-WAKE_ALLOWED_NETWORKS=192.168.10.0/24,10.50.0.0/24
-```
-
-Für bewusst öffentliches Wake steht `WAKE_SOURCE_POLICY=any` bereit; dann sollte gegebenenfalls `WAKE_PACKET_COUNT` erhöht werden. Die Wake-Richtlinie ist keine Firewall: Sie steuert nur, ob der schlafende Prozess startet.
-
-Bewertet wird die Quelladresse, die der Container sieht. Bei normalem Docker-Port-Publishing bleibt die ursprüngliche LAN-Quelle für UDP üblicherweise erhalten. Die Wake-Logs prüfen; schreibt NAT oder ein Proxy die Adresse um, muss das übersetzte Netz erlaubt werden.
+`WAKE_SOURCE_POLICY` entscheidet anhand der Quelladresse, die der Container sieht, ob ein Paket den Server wecken darf. Für LAN, geroutete VPNs oder öffentliches Wake die passende Einstellung in der [Netzwerkanleitung](NETWORKING.de.md#wake-quellrichtlinien) wählen.
 
 ## Leerlaufentscheidung
 

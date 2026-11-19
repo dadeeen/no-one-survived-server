@@ -38,4 +38,10 @@ Both helpers drop root privileges and use the configured container identity. The
 
 Backups reject symbolic links and special files before creating an archive or pruning older backups. Hard-linked regular files are stored independently so the archive can be restored safely.
 
-The restore helper uses a private staging tree (`umask 0077`), validates the complete archive and rejects paths outside `saved/`, links and special files. It renames the existing `SAVED_DIR` to a sibling `<name>.before-restore.<timestamp>.<suffix>` and replaces it with the restored directory. If the swap fails or is interrupted by `SIGHUP`, `SIGINT` or `SIGTERM` before the replacement completes, it attempts to restore the previous directory. A rollback failure identifies the retained data path. `SIGKILL` and a host crash cannot be handled; if interrupted that way, check for the retained directory before waking the server.
+Before replacing any saves, `nos-restore` checks the entire archive and extracts it into a private directory (`umask 0077`). It rejects paths outside `saved/`, links and special files.
+
+### Where are my previous saves after an interrupted restore?
+
+During the swap, `nos-restore` renames the previous save directory. It sits alongside `SAVED_DIR` and, with the default settings, is named `/data/saved.before-restore.<timestamp>.<suffix>`. If the swap fails or is interrupted by `SIGHUP`, `SIGINT` or `SIGTERM`, the script tries to move the previous directory back to `SAVED_DIR`. If that fails, the error message gives the path to the retained data.
+
+After `SIGKILL` or a host crash, automatic rollback may not have run. Before waking the server, check `SAVED_DIR` and look in its parent directory for the previous saves.

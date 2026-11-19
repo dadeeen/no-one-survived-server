@@ -35,12 +35,7 @@ The first connection packet wakes the server but cannot complete the join. Retry
 
 ## Quick start with Portainer
 
-1. Create the two password files as shown in the [Portainer example guide](examples/README.md#1-create-password-files).
-2. Open **Stacks → Add stack → Web editor** and paste [`examples/portainer-stack.yaml`](examples/portainer-stack.yaml).
-3. Edit the visible values directly in the YAML.
-4. Choose a permanent stack name and deploy.
-
-No separate environment file is required. The stack contains the common settings for a normal installation; add optional variables from [Configuration](docs/CONFIGURATION.md) only when needed.
+A ready-to-use stack is available for Portainer. Follow the [Portainer guide](docs/PORTAINER.md) to create the password files, deploy the stack in the web editor and check the first start.
 
 ## Most common settings
 

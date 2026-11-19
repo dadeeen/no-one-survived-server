@@ -31,25 +31,7 @@ The count is maintained per source IP, not globally. An attacker from one IP can
 
 ## Wake source policy
 
-The recommended default is intentionally simple:
-
-```env
-WAKE_SOURCE_POLICY=private
-WAKE_ALLOWED_NETWORKS=
-```
-
-`private` trusts common LAN, Docker and overlay IPv4 ranges and denies public IPv4 sources. Optional `WAKE_ALLOWED_NETWORKS` entries extend those built-in ranges.
-
-For a strict list, use:
-
-```env
-WAKE_SOURCE_POLICY=allowlist
-WAKE_ALLOWED_NETWORKS=192.168.10.0/24,10.50.0.0/24
-```
-
-For deliberately public wake, use `WAKE_SOURCE_POLICY=any` and consider increasing `WAKE_PACKET_COUNT`. The wake policy is not a firewall: it only controls whether the sleeping process starts.
-
-The source address is evaluated as seen inside the container. With normal Docker port publishing, the original LAN source is usually preserved for UDP. Verify it in the wake log; if NAT or a proxy rewrites it, allow the translated subnet.
+`WAKE_SOURCE_POLICY` uses the source address seen by the container to decide whether a packet can wake the server. Choose the policy for your LAN, routed VPN or public server in the [networking guide](NETWORKING.md#wake-source-policies).
 
 ## Idle decision
 

@@ -35,12 +35,7 @@ Das erste Verbindungspaket weckt den Server, kann den Beitritt aber nicht abschl
 
 ## Schnellstart mit Portainer
 
-1. Die beiden Passwortdateien wie in der [Portainer-Beispielanleitung](examples/README.de.md#1-passwortdateien-anlegen) erstellen.
-2. Unter **Stacks → Add stack → Web editor** den Inhalt von [`examples/portainer-stack.yaml`](examples/portainer-stack.yaml) einfügen.
-3. Die sichtbaren Werte direkt im YAML anpassen.
-4. Einen dauerhaften Stacknamen wählen und bereitstellen.
-
-Eine zusätzliche Env-Datei ist nicht erforderlich. Der Stack enthält die üblichen Einstellungen für eine normale Installation; optionale Variablen aus der [Konfiguration](docs/CONFIGURATION.de.md) nur bei Bedarf ergänzen.
+Für Portainer gibt es einen fertigen Stack. Die [Portainer-Anleitung](docs/PORTAINER.de.md) führt durch das Anlegen der Passwortdateien, die Bereitstellung im Webeditor und den ersten Start.
 
 ## Häufigste Einstellungen
 
