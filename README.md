@@ -5,11 +5,6 @@
 A Wine/SteamCMD container for the **No One Survived** dedicated server. It installs and updates the server automatically, keeps saves persistent, wakes on an allowed UDP packet and shuts the game process down after a configurable idle period.
 
 > This project is unofficial and is not affiliated with Cat Play Studio, Steam or Valve. It does not redistribute game or dedicated-server files.
->
-> **Validation status**
->
-> - Passed locally: installation and update, Wine startup, A2S response, UDP wake and graceful sleep.
-> - Not yet fully validated: long-term operation, save persistence across game updates and public reachability across different network types.
 
 ## Quick start with Docker Compose
 
@@ -109,9 +104,9 @@ docker kill --signal SIGUSR2 no-one-survived  # sleep
 
 Clients connect to a reachable address of the Docker host, VM or container host. Routed networks usually require direct IP or a Steam favorite because broadcast discovery does not normally cross routers.
 
-`WAKE_SOURCE_POLICY` controls only who may wake a sleeping server; it is not a firewall for the running server. Deployment examples and public-access considerations are documented in [Networking](docs/NETWORKING.md).
+`WAKE_SOURCE_POLICY` controls who can wake the server. The firewall and server password control access once it is running.
 
-> **Public IPv4 / DS-Lite:** If the server appears in the in-game list but joining stalls or times out, verify that the internet connection has a dedicated public IPv4 address. With DS-Lite/CGNAT, outbound Steam registration may succeed while unsolicited inbound UDP traffic to ports `7777` and `27015` cannot be forwarded through the provider-side NAT. Router port forwarding alone is then insufficient; a public IPv4/dual-stack option or an externally reachable tunnel or relay may be required. This behavior has not yet been conclusively confirmed for No One Survived and should be treated as a troubleshooting lead, not a confirmed game limitation.
+If the server is listed but players cannot join over the internet, [DS-Lite or CGNAT](docs/NETWORKING.md#ds-lite-and-cgnat) may be blocking inbound IPv4 connections.
 
 ## Build locally
 
@@ -124,15 +119,7 @@ The runtime is built directly from the official `debian:trixie-slim` image, offi
 
 ## Validation status
 
-The repository includes tests for UDP wake, CIDR policies, A2S parsing, INI-preserving configuration updates, secret validation, Compose and copy-and-paste Portainer deployment models, update scheduling, backup/restore safety and runtime-image invariants. The image build also smoke-tests amd64/i386 support, required runtime commands, SteamCMD startup and creation of a fresh Wine prefix.
-
-When hosted Actions are unavailable, the complete routine check can be run from PowerShell with:
-
-```powershell
-pwsh -NoProfile -File ./scripts/run-local-ci.ps1
-```
-
-The optional real-server and A2S checks are documented under [Local CI](docs/LOCAL-CI.md). A production release should not be treated as validated until the current game build has passed startup, A2S, graceful-stop and save-persistence checks on a Docker host.
+Local tests with the dedicated server confirmed installation, updates, Wine startup, UDP wake, A2S responses and graceful sleep. Long-term operation, save persistence across game updates and public reachability across different network types still need testing.
 
 ## Documentation
 

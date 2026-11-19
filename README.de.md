@@ -5,11 +5,6 @@
 Ein Wine-/SteamCMD-Container für den Dedicated Server von **No One Survived**. Er installiert und aktualisiert den Server automatisch, hält Spielstände persistent, weckt bei einem erlaubten UDP-Paket und beendet den Gameserverprozess nach einer einstellbaren Leerlaufzeit.
 
 > Dieses Projekt ist inoffiziell und steht in keiner Verbindung zu Cat Play Studio, Steam oder Valve. Spiel- und Dedicated-Server-Dateien werden nicht weiterverteilt.
->
-> **Validierungsstand**
->
-> - Lokal erfolgreich geprüft: Installation und Update, Wine-Start, A2S-Antwort, UDP-Wake und sauberer Schlafzustand.
-> - Noch nicht abschließend geprüft: Langzeitbetrieb, Spielstandpersistenz über Spielupdates hinweg und öffentliche Erreichbarkeit in unterschiedlichen Netztypen.
 
 ## Schnellstart mit Docker Compose
 
@@ -109,9 +104,9 @@ docker kill --signal SIGUSR2 no-one-survived  # schlafen
 
 Clients verbinden sich mit einer erreichbaren Adresse des Docker-Hosts, der VM oder des Container-Hosts. In gerouteten Netzen sind meist Direkt-IP oder Steam-Favorit erforderlich, da Broadcast-Erkennung Router normalerweise nicht überschreitet.
 
-`WAKE_SOURCE_POLICY` steuert nur, wer einen schlafenden Server wecken darf; die Einstellung ist keine Firewall für den laufenden Server. Deployment-Beispiele und Hinweise zu öffentlichem Zugriff stehen unter [Netzwerk](docs/NETWORKING.de.md).
+`WAKE_SOURCE_POLICY` steuert, wer den Server wecken darf. Den Zugriff auf den laufenden Server regeln Firewall und Serverpasswort.
 
-> **Öffentliche IPv4 / DS-Lite:** Erscheint der Server in der In-Game-Liste, der Beitritt bleibt aber im Ladebildschirm hängen oder läuft in einen Timeout, sollte geprüft werden, ob der Internetanschluss eine eigene öffentliche IPv4-Adresse besitzt. Bei DS-Lite/CGNAT kann die ausgehende Registrierung bei Steam funktionieren, während eingehender UDP-Verkehr auf den Ports `7777` und `27015` nicht durch das providerseitige NAT weitergeleitet wird. Eine Portfreigabe im Router allein reicht dann nicht; erforderlich kann eine öffentliche IPv4-/Dual-Stack-Option oder ein extern erreichbarer Tunnel beziehungsweise Relay sein. Dieses Verhalten ist für No One Survived noch nicht abschließend bestätigt und ist als Hinweis zur Fehlerdiagnose, nicht als bestätigte Einschränkung des Spiels zu verstehen.
+Ist der Server gelistet, aber über das Internet nicht erreichbar, können [DS-Lite oder CGNAT](docs/NETWORKING.de.md#ds-lite-und-cgnat) eingehende IPv4-Verbindungen verhindern.
 
 ## Lokal bauen
 
@@ -124,15 +119,7 @@ Die Laufzeit wird direkt aus dem offiziellen Image `debian:trixie-slim`, den off
 
 ## Validierungsstand
 
-Das Repository enthält Tests für UDP-Wake, CIDR-Richtlinien, A2S-Auswertung, den erhaltenden INI-Merge, Secret-Validierung, die Docker-Compose- und direkt einsetzbaren Portainer-Modelle, Update-Zeitsteuerung, Backup-/Restore-Sicherheit und die Invarianten des Laufzeitimages. Der Image-Build prüft zusätzlich amd64-/i386-Unterstützung, notwendige Laufzeitprogramme, den SteamCMD-Start und die Erstellung eines frischen Wine-Prefix.
-
-Ist die gehostete Actions-Ausführung nicht verfügbar, lässt sich die vollständige reguläre Prüfung lokal aus PowerShell starten:
-
-```powershell
-pwsh -NoProfile -File ./scripts/run-local-ci.ps1
-```
-
-Die optionalen Prüfungen mit echtem Gameserver und A2S sind unter [Lokale CI](docs/LOCAL-CI.de.md) beschrieben. Ein produktives Release sollte erst als validiert gelten, wenn der aktuelle Spielbuild auf einem Docker-Host hinsichtlich Start, A2S, sauberem Stop und persistierenden Spielständen geprüft wurde.
+Lokale Tests mit dem Dedicated Server haben Installation, Update, Wine-Start, Aufwecken per UDP, A2S-Antwort und sauberes Einschlafen bestätigt. Offen sind Langzeitbetrieb, der Erhalt von Spielständen über Spielupdates hinweg und die öffentliche Erreichbarkeit bei unterschiedlichen Anschlussarten.
 
 ## Dokumentation
 
